@@ -1,10 +1,10 @@
 import os
 
 # Path to actions file (must exist in same folder)
-ACTIONS_FILE = "actions.txt"
+ACTIONS_FILE = os.path.join(os.path.dirname(__file__), "../data/actions.txt")
 
 # Where data will be stored
-DATA_PATH = os.path.join(os.getcwd(), "MP_Data")
+DATA_PATH = os.path.join(os.path.dirname(__file__), "../data/MP_Data")
 
 # Recording params
 SEQUENCE_LENGTH = 20          # number of frames per sequence
