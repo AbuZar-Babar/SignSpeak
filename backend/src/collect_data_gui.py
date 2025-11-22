@@ -1,252 +1,379 @@
+# import sys
+# import os
+
+# # === PATH SETUP (Fixes ModuleNotFoundError) ===
+# # Get the path to the 'src' folder
+# current_dir = os.path.dirname(os.path.abspath(__file__))
+# # Get the project root (one folder up)
+# project_root = os.path.dirname(current_dir)
+# # Get the config folder path
+# config_dir = os.path.join(project_root, 'config')
+
+# # Add config to Python's search path so we can import actions_config
+# sys.path.append(config_dir)
+# # ==============================================
+
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
 import cv2
 import os
 import numpy as np
-import time
-import threading
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
-
+from PIL import Image, ImageTk
 import mediapipe as mp
 
-from actions_config import (
+# Import config
+from config.actions_config import (
     load_actions,
     ACTIONS_FILE,
     DATA_PATH,
     SEQUENCE_LENGTH,
     NUM_SEQUENCES,
-    FRAME_WAIT_MS,
 )
 
+# ==========================================
+# 🎨  Styling & Constants
+# ==========================================
+COLOR_BG = "#2E2E2E"         # Dark Grey
+COLOR_PANEL = "#3C3F41"      # Lighter Grey
+COLOR_ACCENT = "#00ADB5"     # Teal
+COLOR_TEXT = "#EEEEEE"       # White
+COLOR_RED = "#FF5722"        # Orange/Red for Recording
+COLOR_GREEN = "#4CAF50"      # Green for Success
 
-# ------------------------------
-# Mediapipe setup
-# ------------------------------
+FONT_HEADER = ("Helvetica", 16, "bold")
+FONT_BODY = ("Helvetica", 12)
+
+# ==========================================
+# 🧠  MediaPipe Setup
+# ==========================================
 mp_holistic = mp.solutions.holistic
 mp_drawing = mp.solutions.drawing_utils
 
+class DataCollectorApp:
+    def __init__(self, window):
+        self.window = window
+        self.window.title("SignSpeak Data Collector")
+        self.window.geometry("1100x700")
+        self.window.configure(bg=COLOR_BG)
 
-def mediapipe_detection(image, model):
-    image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    image_rgb.flags.writeable = False
-    results = model.process(image_rgb)
-    image_rgb.flags.writeable = True
-    image_bgr = cv2.cvtColor(image_rgb, cv2.COLOR_RGB2BGR)
-    return image_bgr, results
-
-
-def extract_keypoints(results):
-    pose = np.zeros(33 * 3)
-    if results.pose_landmarks:
-        pose = np.array([[lm.x, lm.y, lm.z] for lm in results.pose_landmarks.landmark]).flatten()
-
-    left = np.zeros(21 * 3)
-    if results.left_hand_landmarks:
-        left = np.array([[lm.x, lm.y, lm.z] for lm in results.left_hand_landmarks.landmark]).flatten()
-
-    right = np.zeros(21 * 3)
-    if results.right_hand_landmarks:
-        right = np.array([[lm.x, lm.y, lm.z] for lm in results.right_hand_landmarks.landmark]).flatten()
-
-    return np.concatenate([pose, left, right])
-
-
-def draw_landmarks(image, results):
-    mp_drawing.draw_landmarks(image, results.pose_landmarks, mp_holistic.POSE_CONNECTIONS)
-    mp_drawing.draw_landmarks(image, results.left_hand_landmarks, mp_holistic.HAND_CONNECTIONS)
-    mp_drawing.draw_landmarks(image, results.right_hand_landmarks, mp_holistic.HAND_CONNECTIONS)
-
-
-# ------------------------------
-# GUI Class
-# ------------------------------
-class DataCollectorGUI:
-    def __init__(self):
-        self.window = tk.Tk()
-        self.window.title("SignSpeak – Advanced Data Collector")
-        self.window.geometry("720x520")
-
-        self.stop_flag = False
-
+        # Data State
         self.actions = load_actions()
-        self.current_action = tk.StringVar(value=self.actions[0])
+        self.current_action = self.actions[0] if self.actions else "None"
+        self.sequence_num = 0
+        self.frame_count = 0
+        
+        # Recording State: "IDLE", "COUNTDOWN", "RECORDING", "COOLDOWN"
+        self.state = "IDLE"
+        self.countdown_value = 0
+        self.countdown_timer = 0
+        
+        # Camera & Model
+        self.cap = cv2.VideoCapture(0)
+        self.holistic = mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5)
 
-        self.build_ui()
+        # Setup UI
+        self.setup_styles()
+        self.create_layout()
+        
+        # Start Loop
+        self.update_feed()
+
+    def setup_styles(self):
+        style = ttk.Style()
+        style.theme_use('clam')
+        
+        # Button Styles
+        style.configure("TButton", font=FONT_BODY, padding=10, background=COLOR_PANEL, foreground=COLOR_TEXT)
+        style.map("TButton", background=[('active', COLOR_ACCENT)])
+        
+        # Action Button Style (Green)
+        style.configure("Action.TButton", background=COLOR_ACCENT, foreground="white", font=("Helvetica", 12, "bold"))
+        
+        # Stop Button Style (Red)
+        style.configure("Stop.TButton", background=COLOR_RED, foreground="white", font=("Helvetica", 12, "bold"))
+
+        # Treeview (Table) Styles
+        style.configure("Treeview", 
+                        background=COLOR_PANEL, 
+                        foreground=COLOR_TEXT, 
+                        fieldbackground=COLOR_PANEL,
+                        font=("Helvetica", 10))
+        style.configure("Treeview.Heading", font=("Helvetica", 11, "bold"), background="#555")
+
+    def create_layout(self):
+        # === Main Container ===
+        container = tk.Frame(self.window, bg=COLOR_BG)
+        container.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+
+        # === LEFT PANEL (Controls) ===
+        left_panel = tk.Frame(container, bg=COLOR_PANEL, width=350)
+        left_panel.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 20))
+        left_panel.pack_propagate(False)  # Force width
+
+        # Title
+        tk.Label(left_panel, text="Control Panel", font=FONT_HEADER, bg=COLOR_PANEL, fg=COLOR_ACCENT).pack(pady=(20, 10))
+
+        # Action Selector
+        tk.Label(left_panel, text="Select Action:", font=FONT_BODY, bg=COLOR_PANEL, fg=COLOR_TEXT).pack(anchor="w", padx=15)
+        
+        self.action_var = tk.StringVar(value=self.current_action)
+        self.combo_actions = ttk.Combobox(left_panel, textvariable=self.action_var, values=self.actions, state="readonly", font=FONT_BODY)
+        self.combo_actions.pack(fill=tk.X, padx=15, pady=5)
+        self.combo_actions.bind("<<ComboboxSelected>>", self.on_action_changed)
+
+        # Add/Delete Buttons
+        btn_frame = tk.Frame(left_panel, bg=COLOR_PANEL)
+        btn_frame.pack(fill=tk.X, padx=10, pady=5)
+        ttk.Button(btn_frame, text="+ New Action", command=self.add_new_action).pack(side=tk.LEFT, expand=True, padx=2)
+        ttk.Button(btn_frame, text="- Delete", command=self.delete_action).pack(side=tk.LEFT, expand=True, padx=2)
+
+        # Sequence Selector (Manual Override)
+        tk.Label(left_panel, text="Target Sequence #:", font=FONT_BODY, bg=COLOR_PANEL, fg=COLOR_TEXT).pack(anchor="w", padx=15, pady=(20, 0))
+        self.seq_var = tk.IntVar(value=0)
+        self.spin_seq = ttk.Spinbox(left_panel, from_=0, to=NUM_SEQUENCES-1, textvariable=self.seq_var, font=FONT_BODY)
+        self.spin_seq.pack(fill=tk.X, padx=15, pady=5)
+
+        # Progress Table
+        tk.Label(left_panel, text="Data Status:", font=FONT_BODY, bg=COLOR_PANEL, fg=COLOR_TEXT).pack(anchor="w", padx=15, pady=(20, 5))
+        columns = ("action", "count")
+        self.tree = ttk.Treeview(left_panel, columns=columns, show="headings", height=8)
+        self.tree.heading("action", text="Action")
+        self.tree.heading("count", text="Seqs Recorded")
+        self.tree.column("action", width=180)
+        self.tree.column("count", width=100, anchor="center")
+        self.tree.pack(fill=tk.X, padx=15, pady=5)
+        
+        # Refresh Table
         self.refresh_table()
 
-        self.window.mainloop()
+        # Spacer
+        tk.Label(left_panel, text="", bg=COLOR_PANEL).pack(expand=True)
 
-    # --------------------------
-    # UI Builder
-    # --------------------------
-    def build_ui(self):
-        top_frame = tk.Frame(self.window)
-        top_frame.pack(pady=10)
+        # === RIGHT PANEL (Camera) ===
+        right_panel = tk.Frame(container, bg=COLOR_BG)
+        right_panel.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
 
-        tk.Label(top_frame, text="Select Action:", font=("Arial", 12)).grid(row=0, column=0, padx=5)
-        self.dropdown = ttk.Combobox(top_frame, values=self.actions, textvariable=self.current_action, width=22)
-        self.dropdown.grid(row=0, column=1, padx=5)
+        # Camera Header
+        self.status_label = tk.Label(right_panel, text="Camera Ready", font=("Helvetica", 14), bg=COLOR_BG, fg="grey")
+        self.status_label.pack(pady=(0, 10))
 
-        tk.Button(top_frame, text="Add Action", command=self.add_action, bg="#3AAFA9", fg="white").grid(row=0, column=2, padx=5)
-        tk.Button(top_frame, text="Remove Action", command=self.remove_action, bg="#D9534F", fg="white").grid(row=0, column=3, padx=5)
+        # Video Label
+        self.video_label = tk.Label(right_panel, bg="black")
+        self.video_label.pack(fill=tk.BOTH, expand=True)
 
-        # Table
-        tk.Label(self.window, text="Actions and Sequence Counts", font=("Arial", 12)).pack()
-        columns = ("action", "collected", "needed")
-        self.tree = ttk.Treeview(self.window, columns=columns, show="headings", height=8)
-        for col in columns:
-            self.tree.heading(col, text=col.capitalize())
-            self.tree.column(col, anchor="center", width=180)
-        self.tree.pack(pady=10)
+        # Bottom Controls
+        control_bar = tk.Frame(right_panel, bg=COLOR_BG)
+        control_bar.pack(fill=tk.X, pady=20)
 
-        # Progress bar
-        self.progress_label = tk.Label(self.window, text="Progress: 0%", font=("Arial", 12))
-        self.progress_label.pack(pady=5)
+        self.btn_start = ttk.Button(control_bar, text="🔴 Start Recording Sequence", style="Action.TButton", command=self.start_recording_process)
+        self.btn_start.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
 
-        self.progress = ttk.Progressbar(self.window, orient="horizontal", length=500, mode="determinate")
-        self.progress.pack(pady=5)
+        # Auto-Advance Checkbox
+        self.auto_advance = tk.BooleanVar(value=True)
+        chk = tk.Checkbutton(control_bar, text="Auto-Next Sequence", variable=self.auto_advance, 
+                             bg=COLOR_BG, fg=COLOR_TEXT, selectcolor=COLOR_PANEL, font=FONT_BODY, activebackground=COLOR_BG, activeforeground=COLOR_TEXT)
+        chk.pack(side=tk.RIGHT, padx=10)
 
-        # Buttons
-        tk.Button(self.window, text="Start Collecting", font=("Arial", 14),
-                  command=self.start_collection_thread, bg="#4CAF50", fg="white").pack(pady=10)
+    # ==========================================
+    # 🔄  Logic & Game Loop
+    # ==========================================
 
-        tk.Button(self.window, text="Stop", font=("Arial", 12),
-                  command=self.stop_collection, bg="red", fg="white").pack()
+    def update_feed(self):
+        """ Main loop called every 10ms """
+        ret, frame = self.cap.read()
+        if ret:
+            # 1. Detection
+            image, results = self.mediapipe_detection(frame)
+            
+            # 2. Draw Landmarks
+            self.draw_styled_landmarks(image, results)
 
-    # --------------------------
-    # Add / Remove Actions
-    # --------------------------
-    def add_action(self):
-        new_action = simpledialog.askstring("Add Action", "Enter new action name:")
-        if new_action and new_action.strip():
-            new_action = new_action.lower().replace(" ", "_")
+            # 3. Handle Recording State
+            self.handle_state_logic(image, results)
 
-            with open(ACTIONS_FILE, "a") as f:
-                f.write(new_action + "\n")
+            # 4. Convert to Tkinter Image
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            img_pil = Image.fromarray(image)
+            
+            # Resize to fit label if needed (optional, keeping raw size for speed)
+            img_tk = ImageTk.PhotoImage(image=img_pil)
+            
+            self.video_label.imgtk = img_tk
+            self.video_label.configure(image=img_tk)
 
-            self.actions = load_actions()
-            self.dropdown.config(values=self.actions)
-            self.current_action.set(self.actions[-1])
-            self.refresh_table()
+        self.window.after(10, self.update_feed)
 
-            messagebox.showinfo("Added", f"Action '{new_action}' added successfully!")
+    def handle_state_logic(self, image, results):
+        h, w, _ = image.shape
 
-    def remove_action(self):
-        action = self.current_action.get()
-        if messagebox.askyesno("Remove Action", f"Delete '{action}' from actions?"):
-            self.actions = [a for a in self.actions if a != action]
+        if self.state == "COUNTDOWN":
+            # Draw Countdown
+            elapsed = (cv2.getTickCount() - self.countdown_timer) / cv2.getTickFrequency()
+            remaining = 3 - int(elapsed)
+            
+            if remaining > 0:
+                cv2.putText(image, str(remaining), (w//2 - 50, h//2), cv2.FONT_HERSHEY_SIMPLEX, 5, (0, 255, 255), 5)
+                self.status_label.config(text=f"Get Ready... {remaining}", fg="orange")
+            else:
+                self.state = "RECORDING"
+                self.frame_count = 0
+                self.status_label.config(text="🎥 RECORDING...", fg=COLOR_RED)
 
+        elif self.state == "RECORDING":
+            # Save Keypoints
+            keypoints = self.extract_keypoints(results)
+            self.save_frame(keypoints)
+            
+            # Visuals
+            cv2.circle(image, (30, 30), 15, (0, 0, 255), -1) # Red Dot
+            cv2.putText(image, "REC", (55, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+            
+            # Progress Bar on Video
+            bar_width = int((self.frame_count / SEQUENCE_LENGTH) * w)
+            cv2.line(image, (0, h-10), (bar_width, h-10), (0, 255, 0), 10)
+
+            self.frame_count += 1
+            if self.frame_count >= SEQUENCE_LENGTH:
+                self.finish_sequence()
+
+        elif self.state == "COOLDOWN":
+            cv2.putText(image, "SAVED!", (w//2 - 100, h//2), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 3)
+            elapsed = (cv2.getTickCount() - self.countdown_timer) / cv2.getTickFrequency()
+            if elapsed > 1.0: # 1 second pause
+                self.state = "IDLE"
+                self.status_label.config(text="Ready", fg="grey")
+                self.btn_start.config(state="normal")
+                
+                # Auto-Advance Logic
+                if self.auto_advance.get():
+                    next_seq = self.sequence_num + 1
+                    if next_seq < NUM_SEQUENCES:
+                        self.seq_var.set(next_seq)
+                        self.start_recording_process() # Loop immediately
+
+    def start_recording_process(self):
+        # Prepare folders
+        self.current_action = self.action_var.get()
+        self.sequence_num = self.seq_var.get()
+        
+        action_path = os.path.join(DATA_PATH, self.current_action, str(self.sequence_num))
+        os.makedirs(action_path, exist_ok=True)
+        
+        # Set state
+        self.state = "COUNTDOWN"
+        self.countdown_timer = cv2.getTickCount()
+        self.btn_start.config(state="disabled")
+
+    def save_frame(self, keypoints):
+        action = self.current_action
+        seq = self.sequence_num
+        frame_num = self.frame_count
+        npy_path = os.path.join(DATA_PATH, action, str(seq), f"{frame_num}.npy")
+        np.save(npy_path, keypoints)
+
+    def finish_sequence(self):
+        self.state = "COOLDOWN"
+        self.countdown_timer = cv2.getTickCount()
+        self.refresh_table()
+        # Increment UI spinner for convenience
+        if self.sequence_num < NUM_SEQUENCES - 1:
+            self.seq_var.set(self.sequence_num + 1)
+
+    # ==========================================
+    # 🛠  Helpers & MediaPipe
+    # ==========================================
+    def mediapipe_detection(self, image):
+        image.flags.writeable = False
+        image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        results = self.holistic.process(image_rgb)
+        image.flags.writeable = True
+        image_rgb = cv2.cvtColor(image_rgb, cv2.COLOR_RGB2BGR)
+        return image, results
+
+    def draw_styled_landmarks(self, image, results):
+        # Draw connections
+        self.mp_draw(image, results.pose_landmarks, mp_holistic.POSE_CONNECTIONS, (80,22,10), (80,44,121))
+        self.mp_draw(image, results.left_hand_landmarks, mp_holistic.HAND_CONNECTIONS, (121,22,76), (121,44,250))
+        self.mp_draw(image, results.right_hand_landmarks, mp_holistic.HAND_CONNECTIONS, (245,117,66), (245,66,230))
+
+    def mp_draw(self, image, model, connections, c1, c2):
+        mp_drawing.draw_landmarks(
+            image, model, connections,
+            mp_drawing.DrawingSpec(color=c1, thickness=2, circle_radius=4),
+            mp_drawing.DrawingSpec(color=c2, thickness=2, circle_radius=2)
+        )
+
+    def extract_keypoints(self, results):
+        pose = np.array([[res.x, res.y, res.z, res.visibility] for res in results.pose_landmarks.landmark]).flatten() if results.pose_landmarks else np.zeros(33*4)
+        lh = np.array([[res.x, res.y, res.z] for res in results.left_hand_landmarks.landmark]).flatten() if results.left_hand_landmarks else np.zeros(21*3)
+        rh = np.array([[res.x, res.y, res.z] for res in results.right_hand_landmarks.landmark]).flatten() if results.right_hand_landmarks else np.zeros(21*3)
+        return np.concatenate([pose, lh, rh]) # Note: Excluding face for speed/size as per standard usage
+
+    # ==========================================
+    # 📂  File / Action Management
+    # ==========================================
+    def refresh_table(self):
+        for i in self.tree.get_children():
+            self.tree.delete(i)
+        
+        # Re-read folders
+        if os.path.exists(DATA_PATH):
+            for action in self.actions:
+                action_path = os.path.join(DATA_PATH, action)
+                count = 0
+                if os.path.exists(action_path):
+                    # Count folders that are numbers
+                    count = len([d for d in os.listdir(action_path) if d.isdigit()])
+                self.tree.insert("", "end", values=(action, f"{count} / {NUM_SEQUENCES}"))
+
+    def add_new_action(self):
+        name = simpledialog.askstring("New Action", "Enter action name:")
+        if name:
+            clean_name = name.strip().replace(" ", "_").lower()
+            if clean_name not in self.actions:
+                with open(ACTIONS_FILE, "a") as f:
+                    f.write("\n" + clean_name)
+                self.actions = load_actions()
+                self.combo_actions.config(values=self.actions)
+                self.refresh_table()
+
+    def delete_action(self):
+        target = self.action_var.get()
+        if not target: return
+        if messagebox.askyesno("Delete", f"Remove '{target}' from list? (Data remains)"):
+            # Remove from list only
+            self.actions = [a for a in self.actions if a != target]
             with open(ACTIONS_FILE, "w") as f:
                 for a in self.actions:
                     f.write(a + "\n")
-
-            self.dropdown.config(values=self.actions)
-            if self.actions:
-                self.current_action.set(self.actions[0])
-
+            self.combo_actions.config(values=self.actions)
+            if self.actions: self.action_var.set(self.actions[0])
             self.refresh_table()
-            messagebox.showinfo("Removed", f"Action '{action}' removed.")
 
-    # --------------------------
-    # Table Refresh
-    # --------------------------
-    def count_sequences(self, action):
-        folder = os.path.join(DATA_PATH, action)
-        if not os.path.exists(folder):
-            return 0
-        return len([seq for seq in os.listdir(folder) if seq.isdigit()])
-
-    def refresh_table(self):
-        for row in self.tree.get_children():
-            self.tree.delete(row)
-
-        for action in self.actions:
-            collected = self.count_sequences(action)
-            needed = NUM_SEQUENCES
-            self.tree.insert("", tk.END, values=(action, collected, needed))
-
-    # --------------------------
-    # Data Collection
-    # --------------------------
-    def start_collection_thread(self):
-        thread = threading.Thread(target=self.collect)
-        thread.daemon = True
-        thread.start()
-
-    def stop_collection(self):
-        self.stop_flag = True
-        self.progress_label.config(text="Stopping...")
-
-    def create_folders(self, action):
+    def on_action_changed(self, event):
+        # Reset sequence counter to first missing sequence
+        action = self.action_var.get()
         action_path = os.path.join(DATA_PATH, action)
-        os.makedirs(action_path, exist_ok=True)
-
-    def collect(self):
-        action = self.current_action.get()
-        self.stop_flag = False
-
-        self.create_folders(action)
-
-        # Count how many sequences are done
-        start_seq = self.count_sequences(action)
-
-        total = NUM_SEQUENCES
-        self.progress["maximum"] = total
-
-        cap = cv2.VideoCapture(0)
-
-        with mp_holistic.Holistic(min_detection_confidence=0.5,
-                                  min_tracking_confidence=0.5) as holistic:
-
-            for seq in range(start_seq, NUM_SEQUENCES):
-                if self.stop_flag:
-                    break
-
-                # Countdown
-                for i in range(3, 0, -1):
-                    self.progress_label.config(text=f"Seq {seq+1}/{NUM_SEQUENCES} starts in {i}...")
-                    time.sleep(1)
-
-                seq_folder = os.path.join(DATA_PATH, action, str(seq))
-                os.makedirs(seq_folder, exist_ok=True)
-
-                for frame_num in range(SEQUENCE_LENGTH):
-                    if self.stop_flag:
-                        break
-
-                    ret, frame = cap.read()
-                    if not ret:
-                        self.progress_label.config(text="Camera error!")
-                        return
-
-                    image, results = mediapipe_detection(frame, holistic)
-                    draw_landmarks(image, results)
-
-                    key = extract_keypoints(results)
-                    np.save(os.path.join(seq_folder, f"{frame_num}.npy"), key)
-
-                    cv2.imshow("SignSpeak – Recording", image)
-                    if cv2.waitKey(FRAME_WAIT_MS) & 0xFF == ord('q'):
-                        self.stop_flag = True
-                        break
-
-                # update progress bar
-                self.progress["value"] = seq + 1
-                percent = int(((seq + 1) / total) * 100)
-                self.progress_label.config(text=f"Progress: {percent}%")
-
-                self.refresh_table()
-
-        cap.release()
-        cv2.destroyAllWindows()
-
-        self.refresh_table()
-
-        if self.stop_flag:
-            self.progress_label.config(text="Stopped.")
+        if os.path.exists(action_path):
+            existing = [int(d) for d in os.listdir(action_path) if d.isdigit()]
+            if existing:
+                # Suggest next number
+                self.seq_var.set(max(existing) + 1)
+            else:
+                self.seq_var.set(0)
         else:
-            self.progress_label.config(text="Completed!")
-            messagebox.showinfo("Done", f"All sequences recorded for '{action}'")
-
+            self.seq_var.set(0)
+            
+    def close(self):
+        self.cap.release()
+        self.window.destroy()
 
 if __name__ == "__main__":
-    DataCollectorGUI()
+    root = tk.Tk()
+    app = DataCollectorApp(root)
+    root.protocol("WM_DELETE_WINDOW", app.close)
+    root.mainloop()

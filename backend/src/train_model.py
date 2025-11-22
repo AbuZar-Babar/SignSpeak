@@ -1,6 +1,9 @@
 # train_model.py
-import numpy as np
+import sys
 import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
+import numpy as np
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense
 from tensorflow.keras.optimizers import Adam
@@ -9,7 +12,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 import joblib
 
-from actions_config import load_actions, DATA_PATH, SEQUENCE_LENGTH, NUM_SEQUENCES, BATCH_SIZE, EPOCHS, LEARNING_RATE
+from config.actions_config import load_actions, DATA_PATH, SEQUENCE_LENGTH, NUM_SEQUENCES, BATCH_SIZE, EPOCHS, LEARNING_RATE
 
 def load_data(actions):
     sequences, labels = [], []
@@ -58,9 +61,9 @@ def main():
     # Train
     model.fit(X_train, y_train, epochs=EPOCHS, batch_size=BATCH_SIZE, validation_data=(X_test, y_test))
     # Save model and label encoder
-    model.save("action_model.h5")
-    joblib.dump(le, "label_encoder.pkl")
-    print("Training complete. Model saved to action_model.h5 and label_encoder.pkl")
+    model.save("../models/action_model.h5")
+    joblib.dump(le, "../models/label_encoder.pkl")
+    print("Training complete. Model saved to ../models/action_model.h5 and ../models/label_encoder.pkl")
 
 if __name__ == "__main__":
     main()

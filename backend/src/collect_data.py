@@ -4,7 +4,7 @@ import os
 import numpy as np
 import time
 import mediapipe as mp
-from actions_config import load_actions, DATA_PATH, SEQUENCE_LENGTH, NUM_SEQUENCES, FRAME_WAIT_MS
+from backend.config.actions_config import load_actions, DATA_PATH, SEQUENCE_LENGTH, NUM_SEQUENCES, FRAME_WAIT_MS
 
 mp_holistic = mp.solutions.holistic
 mp_drawing = mp.solutions.drawing_utils
@@ -33,11 +33,11 @@ def draw_landmarks(image, results):
                               mp_drawing.DrawingSpec(color=(245,66,230), thickness=2, circle_radius=2))
 
 def extract_keypoints(results):
-    # Pose: 33 landmarks * 3
-    pose = np.zeros(33*3)
+    # Pose: 33 landmarks * 4
+    pose = np.zeros(33*4)
     if results.pose_landmarks:
         pose_landmarks = results.pose_landmarks.landmark
-        pose = np.array([[lm.x, lm.y, lm.z] for lm in pose_landmarks]).flatten()
+        pose = np.array([[lm.x, lm.y, lm.z, lm.visibility] for lm in pose_landmarks]).flatten()
     # Left hand: 21 * 3
     left = np.zeros(21*3)
     if results.left_hand_landmarks:

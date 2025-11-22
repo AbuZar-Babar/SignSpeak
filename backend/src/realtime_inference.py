@@ -1,4 +1,8 @@
 # realtime_inference.py
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
 import cv2
 import numpy as np
 import tensorflow as tf
@@ -7,7 +11,7 @@ import joblib
 import time
 import mediapipe as mp
 
-from actions_config import load_actions, SEQUENCE_LENGTH, PREDICTION_THRESHOLD, DATA_PATH
+from config.actions_config import load_actions, SEQUENCE_LENGTH, PREDICTION_THRESHOLD, DATA_PATH
 
 mp_holistic = mp.solutions.holistic
 mp_drawing = mp.solutions.drawing_utils
@@ -21,9 +25,9 @@ def mediapipe_detection(image, model):
     return image_bgr, results
 
 def extract_keypoints(results):
-    pose = np.zeros(33*3)
+    pose = np.zeros(33*4)
     if results.pose_landmarks:
-        pose = np.array([[lm.x, lm.y, lm.z] for lm in results.pose_landmarks.landmark]).flatten()
+        pose = np.array([[lm.x, lm.y, lm.z, lm.visibility] for lm in results.pose_landmarks.landmark]).flatten()
     left = np.zeros(21*3)
     if results.left_hand_landmarks:
         left = np.array([[lm.x, lm.y, lm.z] for lm in results.left_hand_landmarks.landmark]).flatten()
@@ -47,8 +51,8 @@ def main():
     actions = load_actions()
     print("Actions:", actions)
     # load model + label encoder
-    model = load_model("action_model.h5")
-    le = joblib.load("label_encoder.pkl")
+    model = load_model(os.path.join(os.path.dirname(os.path.dirname(__file__)), "models", "action_model.h5"))
+    le = joblib.load(os.path.join(os.path.dirname(os.path.dirname(__file__)), "models", "label_encoder.pkl"))
 
     sequence = []
     sentence = []
