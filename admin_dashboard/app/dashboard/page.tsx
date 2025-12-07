@@ -1,5 +1,4 @@
-import { Users, BookOpen, MessageSquare, TrendingUp, Camera, Settings, Edit } from 'lucide-react'
-import Link from 'next/link'
+import { Users, BookOpen, MessageSquare, TrendingUp } from 'lucide-react'
 
 // Mock Data (Replace with Firebase calls later)
 const stats = [
@@ -34,37 +33,6 @@ const stats = [
         trend: 'up',
         icon: TrendingUp,
         color: '#A855F7',
-    },
-]
-
-const actionCards = [
-    {
-        title: 'Manage Users',
-        subtitle: 'View and manage user accounts',
-        icon: Users,
-        color: '#2B70C9',
-        href: '/dashboard/users',
-    },
-    {
-        title: 'Update Dictionary',
-        subtitle: 'Add, edit, or remove sign language entries',
-        icon: Edit,
-        color: '#58CC02',
-        href: '/dashboard/dictionary',
-    },
-    {
-        title: 'View Complaints',
-        subtitle: 'Review and respond to user complaints',
-        icon: MessageSquare,
-        color: '#FF9600',
-        href: '/dashboard/complaints',
-    },
-    {
-        title: 'Settings',
-        subtitle: 'Configure system settings',
-        icon: Settings,
-        color: '#A855F7',
-        href: '/dashboard/settings',
     },
 ]
 
@@ -110,38 +78,6 @@ export default function DashboardPage() {
                             <span className="text-xs text-gray-500 font-semibold">from last month</span>
                         </div>
                     </div>
-                ))}
-            </div>
-
-            {/* Action Cards */}
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {actionCards.map((card) => (
-                    <Link key={card.title} href={card.href}>
-                        <div 
-                            className="duo-card p-6 h-32 cursor-pointer"
-                            style={{ borderColor: card.color }}
-                        >
-                            <div className="flex items-center justify-between h-full">
-                                <div className="flex-1">
-                                    <h3 className="text-lg font-extrabold text-duo-text mb-2">
-                                        {card.title}
-                                    </h3>
-                                    <p className="text-sm font-semibold text-gray-500">
-                                        {card.subtitle}
-                                    </p>
-                                </div>
-                                <div 
-                                    className="rounded-full p-3"
-                                    style={{ backgroundColor: `${card.color}20` }}
-                                >
-                                    <card.icon 
-                                        className="h-7 w-7" 
-                                        style={{ color: card.color }}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </Link>
                 ))}
             </div>
 
