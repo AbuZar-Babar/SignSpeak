@@ -1,27 +1,55 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
+  --font-nunito: 'Nunito', sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
-  }
+* {
+  font-family: var(--font-nunito);
 }
 
 body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+  background-color: #FAFAFA;
+  color: #4B4B4B;
+  font-family: var(--font-nunito);
+}
+
+/* Duolingo-inspired card styles */
+.duo-card {
+  background: white;
+  border: 2px solid #E5E5E5;
+  border-radius: 16px;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+}
+
+.duo-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.1);
+}
+
+.duo-button {
+  background-color: #58CC02;
+  color: white;
+  border: none;
+  border-radius: 16px;
+  padding: 12px 24px;
+  font-weight: 700;
+  font-size: 16px;
+  box-shadow: 0 4px 0 rgba(88, 204, 2, 0.3);
+  transition: all 0.2s ease;
+}
+
+.duo-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 rgba(88, 204, 2, 0.3);
+}
+
+.duo-button:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 rgba(88, 204, 2, 0.3);
 }

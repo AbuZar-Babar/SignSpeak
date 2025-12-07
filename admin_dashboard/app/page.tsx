@@ -1,17 +1,27 @@
-import Link from 'next/link'
+"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "../contexts/AuthContext";
 
 export default function Home() {
+    const { user, loading } = useAuth();
+    const router = useRouter();
+
+    useEffect(() => {
+        if (!loading) {
+            if (user) {
+                router.push("/dashboard");
+            } else {
+                router.push("/login");
+            }
+        }
+    }, [user, loading, router]);
+
     return (
-        <main className="flex min-h-screen flex-col items-center justify-center p-24">
-            <h1 className="text-4xl font-bold mb-8">SignSpeak Admin</h1>
-            <div className="flex gap-4">
-                <Link href="/login" className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
-                    Login
-                </Link>
-                <Link href="/dashboard" className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">
-                    Dashboard
-                </Link>
-            </div>
-        </main>
-    )
+        <div className="flex min-h-screen items-center justify-center bg-duo-bg">
+            {/* Optional Loading Spinner */}
+            <div className="text-lg font-bold text-duo-text">Loading...</div>
+        </div>
+    );
 }
