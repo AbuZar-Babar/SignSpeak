@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+python-multipart
+# mediapipe
+# tensorflow
+firebase-admin
+pydantic-settings
+opencv-python
+joblib
+
+
