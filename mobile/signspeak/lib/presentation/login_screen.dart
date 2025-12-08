@@ -15,6 +15,9 @@ class _LoginScreenState extends State<LoginScreen>
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _authService = AuthService();
+  bool _obscurePassword = true;
+  String? _emailError;
+  String? _passwordError;
 
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
@@ -51,21 +54,77 @@ class _LoginScreenState extends State<LoginScreen>
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
 
-    if (email.isEmpty || password.isEmpty) return;
+    // Reset errors
+    setState(() {
+      _emailError = null;
+      _passwordError = null;
+    });
 
-    final success = await _authService.signIn(email, password);
-    if (success && mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const MainWrapper()),
-      );
-    } else {
+    // Validate fields
+    bool hasError = false;
+
+    if (email.isEmpty) {
+      setState(() {
+        _emailError = 'Email is required';
+      });
+      hasError = true;
+    } else if (!_isValidEmail(email)) {
+      setState(() {
+        _emailError = 'Please enter a valid email address';
+      });
+      hasError = true;
+    }
+
+    if (password.isEmpty) {
+      setState(() {
+        _passwordError = 'Password is required';
+      });
+      hasError = true;
+    }
+
+    if (hasError) {
       if (mounted) {
-        ScaffoldMessenger.of(
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please fill in all required fields'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      final success = await _authService.signIn(email, password);
+      if (success && mounted) {
+        Navigator.pushReplacement(
           context,
-        ).showSnackBar(const SnackBar(content: Text("Login failed")));
+          MaterialPageRoute(builder: (context) => const MainWrapper()),
+        );
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Login failed. Please check your credentials."),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Error: ${e.toString()}"),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
+  }
+
+  bool _isValidEmail(String email) {
+    return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
   }
 
   @override
@@ -132,19 +191,72 @@ class _LoginScreenState extends State<LoginScreen>
                   children: [
                     TextField(
                       controller: _emailController,
-                      decoration: const InputDecoration(
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: InputDecoration(
                         labelText: 'Email',
-                        prefixIcon: Icon(Icons.email_outlined),
+                        prefixIcon: const Icon(Icons.email_outlined),
+                        errorText: _emailError,
+                        errorBorder: _emailError != null
+                            ? OutlineInputBorder(
+                                borderSide: const BorderSide(color: Colors.red, width: 2),
+                                borderRadius: BorderRadius.circular(16),
+                              )
+                            : null,
+                        focusedErrorBorder: _emailError != null
+                            ? OutlineInputBorder(
+                                borderSide: const BorderSide(color: Colors.red, width: 2),
+                                borderRadius: BorderRadius.circular(16),
+                              )
+                            : null,
                       ),
+                      onChanged: (_) {
+                        if (_emailError != null) {
+                          setState(() {
+                            _emailError = null;
+                          });
+                        }
+                      },
                     ),
                     const SizedBox(height: 16),
                     TextField(
                       controller: _passwordController,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Password',
-                        prefixIcon: Icon(Icons.lock_outline),
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscurePassword
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _obscurePassword = !_obscurePassword;
+                            });
+                          },
+                        ),
+                        errorText: _passwordError,
+                        errorBorder: _passwordError != null
+                            ? OutlineInputBorder(
+                                borderSide: const BorderSide(color: Colors.red, width: 2),
+                                borderRadius: BorderRadius.circular(16),
+                              )
+                            : null,
+                        focusedErrorBorder: _passwordError != null
+                            ? OutlineInputBorder(
+                                borderSide: const BorderSide(color: Colors.red, width: 2),
+                                borderRadius: BorderRadius.circular(16),
+                              )
+                            : null,
                       ),
-                      obscureText: true,
+                      obscureText: _obscurePassword,
+                      onChanged: (_) {
+                        if (_passwordError != null) {
+                          setState(() {
+                            _passwordError = null;
+                          });
+                        }
+                      },
                     ),
                     const SizedBox(height: 32),
                     SizedBox(
