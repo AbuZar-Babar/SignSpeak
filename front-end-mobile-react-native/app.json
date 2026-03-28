@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "SignSpeak Mobile",
+    "slug": "signspeak-mobile-react-native",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "platforms": [
+      "android"
+    ],
+    "userInterfaceStyle": "dark",
+    "android": {
+      "package": "com.signspeak.mobile",
+      "permissions": [
+        "CAMERA",
+        "INTERNET"
+      ],
+      "usesCleartextTraffic": true
+    },
+    "plugins": [
+      "expo-camera",
+      "expo-asset",
+      "react-native-fast-tflite"
+    ]
+  }
+}

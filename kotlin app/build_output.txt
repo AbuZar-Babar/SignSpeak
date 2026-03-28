@@ -1,0 +1,56 @@
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:processDebugNavigationResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:generateDebugRFile UP-TO-DATE
+> Task :app:javaPreCompileDebug UP-TO-DATE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :app:mergeDebugAssets UP-TO-DATE
+> Task :app:compressDebugAssets UP-TO-DATE
+> Task :app:checkDebugDuplicateClasses UP-TO-DATE
+> Task :app:desugarDebugFileDependencies UP-TO-DATE
+> Task :app:mergeExtDexDebug UP-TO-DATE
+> Task :app:mergeLibDexDebug UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:compileDebugNavigationResources UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :app:mergeDebugJniLibFolders
+> Task :app:validateSigningDebug
+> Task :app:writeDebugAppMetadata
+> Task :app:writeDebugSigningConfigVersions
+> Task :app:mergeDebugNativeLibs
+
+> Task :app:stripDebugDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so, libdatastore_shared_counter.so, libimage_processing_util_jni.so, libmediapipe_tasks_vision_jni.so, libsurface_util_jni.so, libtensorflowlite_jni.so. Run with --info option to learn more.
+
+> Task :app:compileDebugKotlin
+w: file:///C:/Users/AbuZar/Desktop/Fyp/signspeak/signspeak-pakistansignlanguage-dataset-model-mobileapp/kotlin%20app/app/src/main/java/com/example/kotlinfrontend/HandExtractor.kt:216:43 'fun handednesses(): (Mutable)List<(Mutable)List<Category!>!>!' is deprecated. Deprecated in Java.
+w: file:///C:/Users/AbuZar/Desktop/Fyp/signspeak/signspeak-pakistansignlanguage-dataset-model-mobileapp/kotlin%20app/app/src/main/java/com/example/kotlinfrontend/HandExtractor.kt:217:20 'fun handednesses(): (Mutable)List<(Mutable)List<Category!>!>!' is deprecated. Deprecated in Java.
+w: file:///C:/Users/AbuZar/Desktop/Fyp/signspeak/signspeak-pakistansignlanguage-dataset-model-mobileapp/kotlin%20app/app/src/main/java/com/example/kotlinfrontend/HandExtractor.kt:249:43 'fun handednesses(): (Mutable)List<(Mutable)List<Category!>!>!' is deprecated. Deprecated in Java.
+w: file:///C:/Users/AbuZar/Desktop/Fyp/signspeak/signspeak-pakistansignlanguage-dataset-model-mobileapp/kotlin%20app/app/src/main/java/com/example/kotlinfrontend/HandExtractor.kt:250:20 'fun handednesses(): (Mutable)List<(Mutable)List<Category!>!>!' is deprecated. Deprecated in Java.
+w: file:///C:/Users/AbuZar/Desktop/Fyp/signspeak/signspeak-pakistansignlanguage-dataset-model-mobileapp/kotlin%20app/app/src/main/java/com/example/kotlinfrontend/MainActivity.kt:134:26 'val LocalLifecycleOwner: ProvidableCompositionLocal<LifecycleOwner>' is deprecated. Moved to lifecycle-runtime-compose library in androidx.lifecycle.compose package.
+w: file:///C:/Users/AbuZar/Desktop/Fyp/signspeak/signspeak-pakistansignlanguage-dataset-model-mobileapp/kotlin%20app/app/src/main/java/com/example/kotlinfrontend/MainActivity.kt:380:26 'fun setTargetResolution(p0: Size): ImageAnalysis.Builder' is deprecated. Deprecated in Java.
+w: file:///C:/Users/AbuZar/Desktop/Fyp/signspeak/signspeak-pakistansignlanguage-dataset-model-mobileapp/kotlin%20app/app/src/main/java/com/example/kotlinfrontend/ui/learn/DictionaryScreen.kt:66:43 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+
+> Task :app:processDebugResources
+> Task :app:compileDebugJavaWithJavac NO-SOURCE
+> Task :app:processDebugJavaRes
+> Task :app:dexBuilderDebug
+> Task :app:mergeProjectDexDebug
+> Task :app:mergeDebugJavaResource
+> Task :app:packageDebug
+> Task :app:createDebugApkListingFileRedirect
+> Task :app:assembleDebug
+
+BUILD SUCCESSFUL in 19s
+35 actionable tasks: 14 executed, 21 up-to-date
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.2.1/userguide/configuration_cache_enabling.html
