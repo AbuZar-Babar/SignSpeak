@@ -4,24 +4,33 @@ from pathlib import Path
 
 import joblib
 import tensorflow as tf
+from tensorflow.keras.models import load_model
 
-from api_server import MODEL_ARTIFACTS, load_model
 from actions_config import SEQUENCE_LENGTH
-
 
 FEATURES_PER_FRAME = 126
 
+MODEL_ARTIFACTS = {
+    "baseline": {
+        "model_path": "all_models/action_model_baseline_new.h5",
+        "encoder_path": "all_models/label_encoder_baseline_new.pkl",
+    },
+    "augmented": {
+        "model_path": "all_models/action_model_augmented_new.h5",
+        "encoder_path": "all_models/label_encoder_augmented_new.pkl",
+    }
+}
+
 
 def convert_to_tflite(model: tf.keras.Model, quantize: bool = False) -> bytes:
-    input_signature = [tf.TensorSpec([1, SEQUENCE_LENGTH, FEATURES_PER_FRAME], tf.float32)]
-
-    @tf.function(input_signature=input_signature, autograph=False)
-    def serving_fn(x):
-        return model(x, training=False)
-
-    concrete = serving_fn.get_concrete_function()
-    converter = tf.lite.TFLiteConverter.from_concrete_functions([concrete], model)
-    converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS]
+    # Use from_keras_model which is safer for Keras 3 / recent TF versions
+    converter = tf.lite.TFLiteConverter.from_keras_model(model)
+    converter.target_spec.supported_ops = [
+        tf.lite.OpsSet.TFLITE_BUILTINS, 
+        tf.lite.OpsSet.SELECT_TF_OPS
+    ]
+    converter._experimental_lower_tensor_list_ops = False
+    converter.experimental_enable_resource_variables = True
     converter.experimental_enable_resource_variables = True
     if quantize:
         # Dynamic-range quantization keeps float I/O for app compatibility
@@ -73,7 +82,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--output-dir",
-        default=".",
+        default="all_models",
         help="Directory where .tflite and labels json files will be written",
     )
     parser.add_argument(

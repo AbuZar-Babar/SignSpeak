@@ -1,30 +1,33 @@
 import os
 
-# Get the directory of this config file
 config_dir = os.path.dirname(os.path.abspath(__file__))
 
-# Path to actions file (relative to this config file)
 ACTIONS_FILE = os.path.join(config_dir, "actions.txt")
 
-# Where data will be stored (relative to this config file)
-DATA_PATH = os.path.join(config_dir, "MP_Data")
+DATASET_FOLDERS = {
+    "laptop": "MP_Data",         
+    "mobile": "MP_Data_mobile",  
+}
+_dataset_setting = os.getenv("SIGNSPEAK_DATASET", "mobile").strip() # Change this line to swap to change dataset
+ACTIVE_DATASET = _dataset_setting.lower()
+DATA_FOLDER = DATASET_FOLDERS.get(ACTIVE_DATASET, _dataset_setting) or DATASET_FOLDERS["mobile"]
+
+# Where data will be stored
+DATA_PATH = DATA_FOLDER if os.path.isabs(DATA_FOLDER) else os.path.join(config_dir, DATA_FOLDER)
 
 # Recording params
-SEQUENCE_LENGTH = 60          # number of frames per sequence (2.0 seconds)
-NUM_SEQUENCES = 50            # how many sequences per action (50 is sufficient with augmentation)
-FRAME_WAIT_MS = 1           # delay between frames during collection (1ms allows max speed)
-
+SEQUENCE_LENGTH = 60          # number of frames per sequence (2 sec on webcam, 3 secs on mobile)
+NUM_SEQUENCES = 20            # how many sequences per action 
+FRAME_WAIT_MS = 1           # delay between frames
 # Model params
 BATCH_SIZE = 16
 EPOCHS = 200
 LEARNING_RATE = 0.001
-
-# Inference params
-PREDICTION_THRESHOLD = 0.8        # Increased to ignore 'weak' wrong guesses during transitions
+PREDICTION_THRESHOLD = 0.8      
 
 # Augmentation params
-USE_AUGMENTATION = True          # Enable/disable augmentation
-AUGMENTATION_MULTIPLIER = 3      # Data expansion factor (e.g., 3x total data)
+USE_AUGMENTATION = True          
+AUGMENTATION_MULTIPLIER = 3      
 AUGMENTATION_PROBABILITIES = {
     'horizontal_flip': 0.3,      # Hand-swapping (mirroring) - ESSENTIAL for hand-dominance
     'time_warp': 0.3,            # Speed variations (reduced)
@@ -36,7 +39,6 @@ AUGMENTATION_PROBABILITIES = {
 }
 
 def load_actions():
-    """Load actions from actions.txt (one per line). Returns list of strings."""
     if not os.path.exists(ACTIONS_FILE):
         raise FileNotFoundError(f"{ACTIONS_FILE} not found. Create it and put one action per line.")
 

@@ -1,1 +1,0 @@
-# SignSpeak ML Pipeline
