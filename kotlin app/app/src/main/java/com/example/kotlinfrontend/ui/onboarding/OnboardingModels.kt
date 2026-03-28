@@ -11,7 +11,9 @@ data class OnboardingPage(
     val title: String,
     val subtitle: String,
     val accentColor: Color,
-    val variant: IllustrationVariant
+    val variant: IllustrationVariant,
+    val previewLabel: String,
+    val previewCaption: String
 )
 
 val defaultOnboardingPages = listOf(
@@ -20,20 +22,26 @@ val defaultOnboardingPages = listOf(
         title = "Turn sign language into readable words in real time.",
         subtitle = "Use the camera to capture PSL gestures and keep recent confirmed predictions in one place.",
         accentColor = BrandPrimary,
-        variant = IllustrationVariant.Translate
+        variant = IllustrationVariant.Translate,
+        previewLabel = "Live Translation",
+        previewCaption = "Hello • السلام علیکم"
     ),
     OnboardingPage(
         eyebrow = "Study smarter",
         title = "Browse a polished PSL dictionary whenever you need to double-check a sign.",
         subtitle = "Search English or Urdu, save important words, and jump into PSL references fast.",
         accentColor = BrandAccent,
-        variant = IllustrationVariant.Dictionary
+        variant = IllustrationVariant.Dictionary,
+        previewLabel = "Gesture Library",
+        previewCaption = "Search words in English or Urdu"
     ),
     OnboardingPage(
         eyebrow = "Improve quality",
         title = "Flag wrong predictions and dictionary issues so the system keeps getting better.",
         subtitle = "Your reports help reviewers clean up entries, retrain weak words, and fix mistakes faster.",
         accentColor = BrandCardPeach,
-        variant = IllustrationVariant.Feedback
+        variant = IllustrationVariant.Feedback,
+        previewLabel = "Quality Reports",
+        previewCaption = "Review and report weak matches"
     )
 )

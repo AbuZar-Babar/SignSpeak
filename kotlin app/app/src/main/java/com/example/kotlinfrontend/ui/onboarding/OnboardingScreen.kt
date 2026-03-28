@@ -1,7 +1,6 @@
 package com.example.kotlinfrontend.ui.onboarding
 
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -27,21 +25,22 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.graphics.graphicsLayer
 import com.example.kotlinfrontend.ui.components.AppBackground
-import com.example.kotlinfrontend.ui.components.HandIllustration
 import com.example.kotlinfrontend.ui.motion.MotionTokens
-import com.example.kotlinfrontend.ui.theme.BrandBackground
+import com.example.kotlinfrontend.ui.theme.BrandAccent
+import com.example.kotlinfrontend.ui.theme.BrandGlass
 import com.example.kotlinfrontend.ui.theme.BrandInk
 import com.example.kotlinfrontend.ui.theme.BrandMuted
 import com.example.kotlinfrontend.ui.theme.BrandPrimary
+import com.example.kotlinfrontend.ui.theme.BrandPrimaryDark
+import com.example.kotlinfrontend.ui.theme.SoftOlive
 import com.example.kotlinfrontend.ui.theme.rememberResponsiveLayoutSpec
 import kotlinx.coroutines.launch
-import kotlin.math.absoluteValue
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun OnboardingScreen(
     onComplete: () -> Unit
@@ -57,11 +56,7 @@ fun OnboardingScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(
-                    horizontal = layoutSpec.horizontalPadding,
-                    vertical = layoutSpec.verticalPadding
-                )
-                .widthIn(max = layoutSpec.contentMaxWidth),
+                .padding(start = 24.dp, end = 32.dp, top = 20.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             Row(
@@ -71,8 +66,9 @@ fun OnboardingScreen(
             ) {
                 Text(
                     text = "SignSpeak",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = BrandInk
+                    style = MaterialTheme.typography.titleLarge,
+                    color = BrandPrimaryDark,
+                    fontWeight = FontWeight.Bold
                 )
                 TextButton(onClick = onComplete) {
                     Text("Skip")
@@ -86,52 +82,105 @@ fun OnboardingScreen(
                     .weight(1f)
             ) { pageIndex ->
                 val page = pages[pageIndex]
-                val pageOffset = (
-                    (pagerState.currentPage - pageIndex) + pagerState.currentPageOffsetFraction
-                    ).absoluteValue
-                val cardScale = animateFloatAsState(
-                    targetValue = 1f - (pageOffset.coerceAtMost(1f) * 0.08f),
+                val isActive = pageIndex == currentPage
+                val scale = animateFloatAsState(
+                    targetValue = if (isActive) 1f else 0.96f,
                     animationSpec = MotionTokens.standardTween(),
                     label = "onboardingScale"
                 )
 
-                Surface(
+                Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(vertical = 12.dp)
-                        .graphicsLayer {
-                            scaleX = cardScale.value
-                            scaleY = cardScale.value
-                            alpha = 1f - pageOffset.coerceAtMost(1f) * 0.18f
-                            translationX = pageOffset * 42f
-                        },
-                    color = BrandBackground.copy(alpha = 0.8f),
-                    shape = RoundedCornerShape(34.dp),
-                    shadowElevation = 8.dp
+                        .padding(top = 24.dp)
+                        .padding(end = 6.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(26.dp)
                 ) {
-                    Column(
+                    Surface(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .padding(22.dp),
-                        verticalArrangement = Arrangement.spacedBy(18.dp)
+                            .fillMaxWidth()
+                            .height(layoutSpec.illustrationHeight + 12.dp),
+                        color = SoftOlive,
+                        shape = RoundedCornerShape(32.dp),
+                        shadowElevation = 10.dp
                     ) {
                         Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(layoutSpec.illustrationHeight + 40.dp)
-                                    .background(
-                                        color = page.accentColor.copy(alpha = 0.12f),
-                                        shape = RoundedCornerShape(30.dp)
-                                ),
+                            modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
                         ) {
-                            HandIllustration(
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(
+                                        Brush.linearGradient(
+                                            colors = listOf(
+                                                SoftOlive,
+                                                page.accentColor.copy(alpha = 0.18f)
+                                            )
+                                        )
+                                    )
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(112.dp * scale.value)
+                                    .background(
+                                        page.accentColor.copy(alpha = 0.24f),
+                                        CircleShape
+                                    )
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(62.dp)
+                                    .align(Alignment.TopEnd)
+                                    .padding(top = 34.dp, end = 28.dp)
+                                    .background(BrandGlass.copy(alpha = 0.3f), CircleShape)
+                            )
+                            Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(12.dp),
-                                variant = page.variant
+                                    .height(layoutSpec.illustrationHeight - 48.dp)
+                                    .padding(horizontal = 28.dp, vertical = 34.dp)
+                                    .background(
+                                        Brush.linearGradient(
+                                            colors = listOf(
+                                                page.accentColor.copy(alpha = 0.18f),
+                                                Color.White.copy(alpha = 0.08f)
+                                            )
+                                        ),
+                                        RoundedCornerShape(30.dp)
+                                    )
                             )
+                            Surface(
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .padding(horizontal = 18.dp, vertical = 18.dp),
+                                shape = RoundedCornerShape(22.dp),
+                                color = BrandGlass
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(
+                                        text = page.previewLabel.uppercase(),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = BrandPrimaryDark
+                                    )
+                                    Text(
+                                        text = page.previewCaption,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = BrandInk
+                                    )
+                                }
+                            }
                         }
+                    }
+
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
                         Text(
                             text = page.eyebrow.uppercase(),
                             style = MaterialTheme.typography.labelLarge,
@@ -145,8 +194,7 @@ fun OnboardingScreen(
                         Text(
                             text = page.subtitle,
                             style = MaterialTheme.typography.bodyLarge,
-                            color = BrandMuted,
-                            modifier = Modifier.alpha(0.95f)
+                            color = BrandMuted
                         )
                     }
                 }
@@ -158,23 +206,23 @@ fun OnboardingScreen(
                     horizontalArrangement = Arrangement.Center
                 ) {
                     repeat(pages.size) { index ->
-                        val width = animateFloatAsState(
-                            targetValue = if (index == currentPage) 28f else 10f,
+                        val indicatorWidth = animateFloatAsState(
+                            targetValue = if (index == currentPage) 22f else 8f,
                             animationSpec = MotionTokens.standardTween(),
-                            label = "dotWidth"
+                            label = "indicatorWidth"
                         )
                         Box(
                             modifier = Modifier
                                 .padding(horizontal = 4.dp)
-                                .height(10.dp)
-                                .size(width = width.value.dp, height = 10.dp)
+                                .size(width = indicatorWidth.value.dp, height = 8.dp)
                                 .background(
-                                    color = if (index == currentPage) pages[index].accentColor else BrandMuted.copy(alpha = 0.22f),
+                                    color = if (index == currentPage) BrandPrimary else BrandAccent.copy(alpha = 0.32f),
                                     shape = CircleShape
                                 )
                         )
                     }
                 }
+
                 Button(
                     onClick = {
                         if (isLastPage) {
@@ -186,20 +234,16 @@ fun OnboardingScreen(
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    shape    = RoundedCornerShape(18.dp),
-                    colors   = ButtonDefaults.buttonColors(
+                    shape = RoundedCornerShape(24.dp),
+                    colors = ButtonDefaults.buttonColors(
                         containerColor = BrandPrimary,
-                        contentColor   = BrandBackground
-                    ),
-                    elevation = ButtonDefaults.buttonElevation(
-                        defaultElevation = 4.dp,
-                        pressedElevation = 1.dp
+                        contentColor = Color.White
                     )
                 ) {
                     Text(
-                        text       = if (isLastPage) "Get Started" else "Continue",
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                        style      = MaterialTheme.typography.titleMedium
+                        text = if (isLastPage) "Get Started" else "Continue",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }

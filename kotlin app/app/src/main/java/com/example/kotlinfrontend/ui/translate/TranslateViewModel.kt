@@ -22,10 +22,19 @@ data class PredictionReportDraft(
     val modelName: String
 )
 
+enum class PredictionReportReason(
+    val title: String
+) {
+    WrongSign("Wrong sign detected"),
+    WrongTranslation("Urdu translation incorrect"),
+    Other("Other")
+}
+
 data class TranslateUiState(
     val sessionState: SessionState = SessionState.initializing(isConfigured = false),
     val recentHistory: List<TranslationHistoryItem> = emptyList(),
     val pendingReport: PredictionReportDraft? = null,
+    val reportReason: PredictionReportReason = PredictionReportReason.WrongSign,
     val expectedWord: String = "",
     val reportNote: String = "",
     val isSubmittingReport: Boolean = false,
@@ -112,11 +121,16 @@ class TranslateViewModel(
                     confidence = confidence,
                     modelName = model.displayName
                 ),
+                reportReason = PredictionReportReason.WrongSign,
                 expectedWord = "",
                 reportNote = "",
                 message = null
             )
         }
+    }
+
+    fun updateReportReason(value: PredictionReportReason) {
+        _uiState.update { current -> current.copy(reportReason = value) }
     }
 
     fun updateExpectedWord(value: String) {
@@ -131,6 +145,7 @@ class TranslateViewModel(
         _uiState.update { current ->
             current.copy(
                 pendingReport = null,
+                reportReason = PredictionReportReason.WrongSign,
                 expectedWord = "",
                 reportNote = "",
                 isSubmittingReport = false
@@ -147,16 +162,26 @@ class TranslateViewModel(
 
         viewModelScope.launch {
             _uiState.update { current -> current.copy(isSubmittingReport = true) }
+            val state = uiState.value
+            val note = buildString {
+                append("Reason: ")
+                append(state.reportReason.title)
+                if (state.reportNote.isNotBlank()) {
+                    append("\n\n")
+                    append(state.reportNote)
+                }
+            }
             val result = complaintRepository.submitFromPrediction(
                 historyId = draft.historyId,
-                expectedWord = uiState.value.expectedWord,
-                note = uiState.value.reportNote
+                expectedWord = state.expectedWord,
+                note = note
             )
 
             _uiState.update { current ->
                 current.copy(
                     isSubmittingReport = false,
                     pendingReport = if (result.isSuccess) null else current.pendingReport,
+                    reportReason = if (result.isSuccess) PredictionReportReason.WrongSign else current.reportReason,
                     expectedWord = if (result.isSuccess) "" else current.expectedWord,
                     reportNote = if (result.isSuccess) "" else current.reportNote,
                     message = result.fold(

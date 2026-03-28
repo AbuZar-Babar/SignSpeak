@@ -5,6 +5,7 @@ import type { ComplaintRow, ComplaintSource, ComplaintStatus, UserRole } from '.
 
 type StatusFilter = 'all' | ComplaintStatus;
 type SourceFilter = 'all' | ComplaintSource;
+type ThemeMode = 'light' | 'dark';
 
 const statusOptions: Array<{ label: string; value: StatusFilter }> = [
   { label: 'All statuses', value: 'all' },
@@ -20,7 +21,46 @@ const sourceOptions: Array<{ label: string; value: SourceFilter }> = [
   { label: 'Dictionary', value: 'dictionary' },
 ];
 
-const statusCards: ComplaintStatus[] = ['open', 'reviewing', 'resolved', 'rejected'];
+const navItems = [
+  { icon: 'dashboard', label: 'Dashboard', active: false },
+  { icon: 'forum', label: 'Complaints', active: true },
+  { icon: 'sign_language', label: 'Interpreters', active: false },
+  { icon: 'leaderboard', label: 'Analytics', active: false },
+  { icon: 'history', label: 'Logs', active: false },
+] as const satisfies ReadonlyArray<{ icon: string; label: string; active?: boolean }>;
+
+const themeStorageKey = 'signspeak-admin-theme';
+
+const statusMeta: Record<
+  ComplaintStatus,
+  { label: string; icon: string; metricHint: string }
+> = {
+  open: {
+    label: 'Open',
+    icon: 'mark_email_unread',
+    metricHint: 'Untriaged complaints',
+  },
+  reviewing: {
+    label: 'Reviewing',
+    icon: 'visibility',
+    metricHint: 'Needs moderator action',
+  },
+  resolved: {
+    label: 'Resolved',
+    icon: 'check_circle',
+    metricHint: 'Closed successfully',
+  },
+  rejected: {
+    label: 'Rejected',
+    icon: 'cancel',
+    metricHint: 'Dismissed reports',
+  },
+};
+
+const sourceMeta: Record<ComplaintSource, { label: string; icon: string }> = {
+  prediction: { label: 'Prediction', icon: 'video_camera_front' },
+  dictionary: { label: 'Dictionary', icon: 'menu_book' },
+};
 
 function formatDate(value: string | null): string {
   if (!value) {
@@ -33,8 +73,21 @@ function formatDate(value: string | null): string {
   }).format(new Date(value));
 }
 
-function titleCase(value: string): string {
-  return value.charAt(0).toUpperCase() + value.slice(1);
+function formatRelativeDate(value: string): string {
+  const deltaMs = Date.now() - new Date(value).getTime();
+  const deltaMinutes = Math.max(1, Math.round(deltaMs / 60000));
+
+  if (deltaMinutes < 60) {
+    return `${deltaMinutes}m ago`;
+  }
+
+  const deltaHours = Math.round(deltaMinutes / 60);
+  if (deltaHours < 24) {
+    return `${deltaHours}h ago`;
+  }
+
+  const deltaDays = Math.round(deltaHours / 24);
+  return `${deltaDays}d ago`;
 }
 
 function complaintHeadline(complaint: ComplaintRow): string {
@@ -46,11 +99,121 @@ function complaintHeadline(complaint: ComplaintRow): string {
   );
 }
 
+function complaintSnippet(complaint: ComplaintRow): string {
+  return complaint.note || complaint.expected_word || 'No user note provided.';
+}
+
 function reporterLabel(complaint: ComplaintRow): string {
   return complaint.reporter_name || complaint.reporter_email || 'Unknown reporter';
 }
 
+function initialsFor(complaint: ComplaintRow): string {
+  const source = reporterLabel(complaint).replace(/[^a-zA-Z0-9 ]/g, ' ');
+  const parts = source
+    .split(' ')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .slice(0, 2);
+
+  if (!parts.length) {
+    return 'SS';
+  }
+
+  return parts.map((part) => part[0]?.toUpperCase() ?? '').join('');
+}
+
+function confidenceLabel(value: number | null): string {
+  return value == null ? 'Not captured' : `${Math.round(value * 100)}%`;
+}
+
+function modelVersionLabel(value: string | null): string {
+  return value || 'Unavailable';
+}
+
+function complaintPriority(status: ComplaintStatus): string {
+  switch (status) {
+    case 'reviewing':
+      return 'High';
+    case 'open':
+      return 'Medium';
+    case 'resolved':
+      return 'Resolved';
+    case 'rejected':
+      return 'Closed';
+    default:
+      return 'Normal';
+  }
+}
+
+function metricDelta(status: ComplaintStatus): string {
+  switch (status) {
+    case 'open':
+      return 'Intake';
+    case 'reviewing':
+      return 'Active';
+    case 'resolved':
+      return 'Stable';
+    case 'rejected':
+      return 'Closed';
+    default:
+      return '';
+  }
+}
+
+function getInitialTheme(): ThemeMode {
+  if (typeof window === 'undefined') {
+    return 'light';
+  }
+
+  const stored = window.localStorage.getItem(themeStorageKey);
+  if (stored === 'light' || stored === 'dark') {
+    return stored;
+  }
+
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+function Icon({
+  name,
+  className,
+}: {
+  name: string;
+  className?: string;
+}) {
+  return (
+    <span aria-hidden="true" className={`material-symbols-outlined ${className ?? ''}`.trim()}>
+      {name}
+    </span>
+  );
+}
+
+function StatusBadge({ status }: { status: ComplaintStatus }) {
+  const meta = statusMeta[status];
+
+  return (
+    <span className={`status-badge status-${status}`}>
+      <Icon className="status-badge-icon" name={meta.icon} />
+      {meta.label}
+    </span>
+  );
+}
+
+function PortalBrand() {
+  return (
+    <div className="portal-brand">
+      <div className="portal-brand-mark">
+        <Icon name="sign_language" />
+      </div>
+      <div>
+        <h1>SignSpeak</h1>
+        <p>Admin Portal</p>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
+  const [theme, setTheme] = useState<ThemeMode>(getInitialTheme);
   const [session, setSession] = useState<Session | null>(null);
   const [role, setRole] = useState<UserRole | null>(null);
   const [profileName, setProfileName] = useState('');
@@ -58,6 +221,7 @@ export default function App() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [authBusy, setAuthBusy] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authNotice, setAuthNotice] = useState<string | null>(null);
@@ -78,6 +242,12 @@ export default function App() {
   const [saveBusy, setSaveBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('theme-dark', theme === 'dark');
+    document.documentElement.style.colorScheme = theme;
+    window.localStorage.setItem(themeStorageKey, theme);
+  }, [theme]);
 
   useEffect(() => {
     const client = supabase;
@@ -263,6 +433,12 @@ export default function App() {
   }, [complaints]);
 
   const pendingCount = complaintMetrics.open + complaintMetrics.reviewing;
+  const filteredResultLabel =
+    complaints.length === 1 ? '1 complaint in scope' : `${complaints.length} complaints in scope`;
+
+  const toggleTheme = () => {
+    setTheme((current) => (current === 'light' ? 'dark' : 'light'));
+  };
 
   const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -373,15 +549,32 @@ export default function App() {
 
   if (supabaseConfigError) {
     return (
-      <main className="auth-shell">
-        <section className="hero-panel">
-          <p className="eyebrow">Configuration required</p>
-          <h1>SignSpeak admin portal cannot start without Supabase keys.</h1>
-          <p className="muted-text">
-            Copy <code>.env.example</code> to <code>.env</code> and set the project URL and
-            publishable key before loading the portal.
-          </p>
-          <p className="error-banner">{supabaseConfigError}</p>
+      <main className="auth-page">
+        <header className="auth-topbar">
+          <PortalBrand />
+          <button
+            aria-label="Toggle dark mode"
+            className="theme-toggle"
+            onClick={toggleTheme}
+            type="button"
+          >
+            <Icon name={theme === 'light' ? 'dark_mode' : 'light_mode'} />
+          </button>
+        </header>
+
+        <section className="auth-stage">
+          <div className="auth-orb auth-orb-primary" />
+          <div className="auth-orb auth-orb-secondary" />
+
+          <article className="auth-card auth-card-wide">
+            <p className="eyebrow">Configuration required</p>
+            <h2 className="page-title">The admin portal cannot start without Supabase keys.</h2>
+            <p className="support-copy">
+              Copy <code>.env.example</code> to <code>.env</code> and set the project URL and
+              publishable key before loading the portal.
+            </p>
+            <p className="inline-feedback inline-feedback-error">{supabaseConfigError}</p>
+          </article>
         </section>
       </main>
     );
@@ -389,61 +582,109 @@ export default function App() {
 
   if (!session) {
     return (
-      <main className="auth-shell">
-        <section className="hero-panel">
-          <p className="eyebrow">SignSpeak Control Desk</p>
-          <h1>Resolve translation complaints before they become user trust issues.</h1>
-          <p className="muted-text">
-            Admins can review reporter context, inspect the suspected word, track prediction
-            details, and send complaints through a clean workflow from open to resolved.
-          </p>
-          <div className="hero-metrics">
-            <article>
-              <strong>One place</strong>
-              <span>Complaint queue, notes, and resolution state</span>
-            </article>
-            <article>
-              <strong>Role-locked</strong>
-              <span>Only accounts marked as admin in Supabase can enter</span>
-            </article>
-          </div>
-        </section>
-
-        <section className="auth-card">
-          <p className="eyebrow">Admin login</p>
-          <h2>Sign in with your Supabase account</h2>
-          <form className="auth-form" onSubmit={handleLogin}>
-            <label>
-              Email
-              <input
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="admin@signspeak.pk"
-              />
-            </label>
-            <label>
-              Password
-              <input
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder="Your password"
-              />
-            </label>
-            <button type="submit" disabled={authBusy}>
-              {authBusy ? 'Signing in...' : 'Sign in'}
-            </button>
-          </form>
-          <button className="secondary-button" onClick={handleResetPassword} disabled={authBusy}>
-            Send password reset email
+      <main className="auth-page">
+        <header className="auth-topbar">
+          <PortalBrand />
+          <button
+            aria-label="Toggle dark mode"
+            className="theme-toggle"
+            onClick={toggleTheme}
+            type="button"
+          >
+            <Icon name={theme === 'light' ? 'dark_mode' : 'light_mode'} />
           </button>
-          {authError ? <p className="error-banner">{authError}</p> : null}
-          {authNotice ? <p className="notice-banner">{authNotice}</p> : null}
-          <p className="muted-text small-text">
-            New accounts will still need <code>public.profiles.role = 'admin'</code> before the
-            portal grants access.
-          </p>
+        </header>
+
+        <section className="auth-stage">
+          <div className="auth-orb auth-orb-primary" />
+          <div className="auth-orb auth-orb-secondary" />
+
+          <article className="auth-card auth-card-wide">
+            <p className="eyebrow">Empathetic Editorial Dashboard</p>
+            <h2 className="page-title">Admin Access</h2>
+            <p className="support-copy">
+              Sign in to review SignSpeak complaints, inspect sign and dictionary context, and
+              maintain resolution quality across the moderation queue.
+            </p>
+
+            <div className="auth-points">
+              <div className="auth-point">
+                <strong>Complaint workspace</strong>
+                <span>Reporter context, prediction context, and resolution notes in one place.</span>
+              </div>
+              <div className="auth-point">
+                <strong>Role-gated access</strong>
+                <span>Only users marked as admin in Supabase can enter the portal.</span>
+              </div>
+            </div>
+          </article>
+
+          <article className="auth-card">
+            <p className="eyebrow">Secure sign in</p>
+            <h3 className="card-title">Use your Supabase admin account</h3>
+
+            <form className="auth-form" onSubmit={handleLogin}>
+              <label>
+                Email
+                <div className="field-shell">
+                  <Icon name="alternate_email" />
+                  <input
+                    autoComplete="email"
+                    onChange={(event) => setEmail(event.target.value)}
+                    placeholder="admin@signspeak.pk"
+                    type="email"
+                    value={email}
+                  />
+                </div>
+              </label>
+
+              <label>
+                <span className="field-label-row">
+                  Password
+                  <button
+                    className="text-link"
+                    disabled={authBusy}
+                    onClick={handleResetPassword}
+                    type="button"
+                  >
+                    Forgot password?
+                  </button>
+                </span>
+                <div className="field-shell">
+                  <Icon name="lock" />
+                  <input
+                    autoComplete="current-password"
+                    onChange={(event) => setPassword(event.target.value)}
+                    placeholder="Your password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                  />
+                  <button
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    className="icon-button ghost-button"
+                    onClick={() => setShowPassword((current) => !current)}
+                    type="button"
+                  >
+                    <Icon name={showPassword ? 'visibility_off' : 'visibility'} />
+                  </button>
+                </div>
+              </label>
+
+              <button className="primary-button" disabled={authBusy} type="submit">
+                <span>{authBusy ? 'Signing in...' : 'Sign in'}</span>
+                <Icon name="login" />
+              </button>
+            </form>
+
+            {authError ? <p className="inline-feedback inline-feedback-error">{authError}</p> : null}
+            {authNotice ? (
+              <p className="inline-feedback inline-feedback-success">{authNotice}</p>
+            ) : null}
+
+            <p className="support-copy support-copy-small">
+              Access is granted only after <code>public.profiles.role = 'admin'</code>.
+            </p>
+          </article>
         </section>
       </main>
     );
@@ -451,312 +692,564 @@ export default function App() {
 
   if (roleLoading) {
     return (
-      <main className="status-shell">
-        <p className="eyebrow">Checking access</p>
-        <h1>Loading your admin profile.</h1>
+      <main className="state-page">
+        <header className="restricted-nav">
+          <PortalBrand />
+          <button
+            aria-label="Toggle dark mode"
+            className="theme-toggle"
+            onClick={toggleTheme}
+            type="button"
+          >
+            <Icon name={theme === 'light' ? 'dark_mode' : 'light_mode'} />
+          </button>
+        </header>
+
+        <section className="state-card">
+          <div className="state-icon">
+            <Icon name="hourglass_top" />
+          </div>
+          <p className="eyebrow">Checking access</p>
+          <h2 className="page-title">Loading your admin profile.</h2>
+          <p className="support-copy">SignSpeak is validating your role and workspace access.</p>
+        </section>
       </main>
     );
   }
 
   if (role !== 'admin') {
     return (
-      <main className="status-shell">
-        <p className="eyebrow">Access blocked</p>
-        <h1>This account is not marked as an admin.</h1>
-        <p className="muted-text">
-          Promote the user in <code>public.profiles.role</code> and sign in again.
-        </p>
-        <div className="status-actions">
-          <button onClick={handleSignOut}>Sign out</button>
-        </div>
+      <main className="state-page">
+        <header className="restricted-nav">
+          <PortalBrand />
+          <div className="topbar-actions">
+            <button
+              aria-label="Toggle dark mode"
+              className="theme-toggle"
+              onClick={toggleTheme}
+              type="button"
+            >
+              <Icon name={theme === 'light' ? 'dark_mode' : 'light_mode'} />
+            </button>
+            <button className="secondary-button" onClick={handleSignOut} type="button">
+              Sign out
+            </button>
+          </div>
+        </header>
+
+        <section className="state-card">
+          <div className="state-icon state-icon-warning">
+            <Icon name="lock_person" />
+          </div>
+          <p className="eyebrow">Access restricted</p>
+          <h2 className="page-title">This account is not marked as an admin.</h2>
+          <p className="support-copy">
+            Promote the user in <code>public.profiles.role</code> and sign in again.
+          </p>
+          <div className="state-actions">
+            <button className="primary-button" onClick={handleSignOut} type="button">
+              <span>Return to sign in</span>
+              <Icon name="logout" />
+            </button>
+          </div>
+        </section>
       </main>
     );
   }
 
   return (
-    <main className="app-shell">
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">SignSpeak Admin Portal</p>
-          <h1>Complaint maintenance</h1>
+    <div className="portal-shell">
+      <aside className="portal-sidebar">
+        <div className="sidebar-section">
+          <PortalBrand />
         </div>
-        <div className="topbar-actions">
-          <div className="admin-summary">
-            <span className="summary-label">Signed in as</span>
-            <strong>{profileName || session.user.email}</strong>
-            <span className="summary-subtle">{session.user.email}</span>
+
+        <nav className="sidebar-nav">
+          {navItems.map((item) => (
+            <button
+              key={item.label}
+              className={`nav-item ${item.active ? 'nav-item-active' : ''}`}
+              type="button"
+            >
+              <Icon name={item.icon} />
+              <span>{item.label}</span>
+            </button>
+          ))}
+        </nav>
+
+        <div className="sidebar-summary panel">
+          <p className="sidebar-summary-title">Weekly resolution</p>
+          <div className="progress-track">
+            <div
+              className="progress-value"
+              style={{
+                width: `${complaints.length ? Math.round((complaintMetrics.resolved / complaints.length) * 100) : 0}%`,
+              }}
+            />
           </div>
-          <button className="secondary-button" onClick={handleSignOut}>
-            Sign out
+          <p className="sidebar-summary-copy">
+            {complaints.length
+              ? `${Math.round((complaintMetrics.resolved / complaints.length) * 100)}% of current results are resolved`
+              : 'No complaints loaded yet'}
+          </p>
+        </div>
+
+        <div className="sidebar-footer">
+          <button className="nav-item" type="button">
+            <Icon name="help" />
+            <span>Support</span>
+          </button>
+          <button className="nav-item" type="button">
+            <Icon name="settings" />
+            <span>Settings</span>
           </button>
         </div>
-      </header>
+      </aside>
 
-      <section className="stat-grid">
-        <article className="hero-stat pending-stat">
-          <span>Pending</span>
-          <strong>{pendingCount}</strong>
-          <small>Open and reviewing complaints</small>
-        </article>
-        {statusCards.map((status) => (
-          <article key={status} className="hero-stat">
-            <span>{titleCase(status)}</span>
-            <strong>{complaintMetrics[status]}</strong>
-            <small>{status === 'resolved' ? 'Completed items' : 'Current filtered items'}</small>
-          </article>
-        ))}
-      </section>
+      <div className="portal-main">
+        <header className="portal-topbar">
+          <div>
+            <p className="eyebrow">Complaint detail workspace</p>
+            <h2 className="page-title page-title-small">SignSpeak moderation queue</h2>
+          </div>
 
-      <section className="toolbar">
-        <div className="toolbar-group">
-          <label>
-            Status
-            <select
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
+          <div className="topbar-tools">
+            <form className="topbar-search" onSubmit={handleSearchSubmit}>
+              <Icon name="search" />
+              <input
+                onChange={(event) => setSearchDraft(event.target.value)}
+                placeholder="Search by word, note, name, or email"
+                type="search"
+                value={searchDraft}
+              />
+            </form>
+
+            <button
+              aria-label="Toggle dark mode"
+              className="theme-toggle"
+              onClick={toggleTheme}
+              type="button"
             >
-              {statusOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Source
-            <select
-              value={sourceFilter}
-              onChange={(event) => setSourceFilter(event.target.value as SourceFilter)}
-            >
-              {sourceOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
+              <Icon name={theme === 'light' ? 'dark_mode' : 'light_mode'} />
+            </button>
 
-        <form className="search-form" onSubmit={handleSearchSubmit}>
-          <input
-            value={searchDraft}
-            onChange={(event) => setSearchDraft(event.target.value)}
-            placeholder="Search by word, note, name, or email"
-          />
-          <button type="submit">Search</button>
-        </form>
+            <button aria-label="Notifications" className="icon-button" type="button">
+              <Icon name="notifications" />
+              {pendingCount ? <span className="notification-dot" /> : null}
+            </button>
 
-        <div className="toolbar-group toolbar-actions">
-          <button className="secondary-button" onClick={clearFilters}>
-            Clear
-          </button>
-          <button className="secondary-button" onClick={() => setRefreshKey((value) => value + 1)}>
-            Refresh
-          </button>
-        </div>
-      </section>
-
-      <section className="workspace">
-        <aside className="list-panel">
-          <div className="panel-header">
-            <div>
-              <p className="eyebrow">Complaint queue</p>
-              <h2>{complaints.length} results</h2>
+            <div className="profile-chip">
+              <div className="profile-avatar">
+                {(profileName || session.user.email || 'S').charAt(0).toUpperCase()}
+              </div>
+              <div className="profile-copy">
+                <strong>{profileName || session.user.email}</strong>
+                <span>{session.user.email}</span>
+              </div>
             </div>
-            {listLoading ? <span className="loading-chip">Loading...</span> : null}
+
+            <button className="secondary-button" onClick={handleSignOut} type="button">
+              Sign out
+            </button>
           </div>
+        </header>
 
-          {listError ? <p className="error-banner">{listError}</p> : null}
-
-          <div className="complaint-list">
-            {!listLoading && !complaints.length ? (
-              <article className="empty-state">
-                <h3>No complaints match the current filter.</h3>
-                <p>Try a different status or remove the search query.</p>
-              </article>
-            ) : null}
-
-            {complaints.map((complaint) => (
-              <button
-                key={complaint.id}
-                className={`complaint-item ${complaint.id === selectedComplaintId ? 'active' : ''}`}
-                onClick={() => setSelectedComplaintId(complaint.id)}
-              >
-                <div className="complaint-item-top">
-                  <strong>{complaintHeadline(complaint)}</strong>
-                  <span className={`status-pill status-${complaint.status}`}>{complaint.status}</span>
+        <main className="portal-content">
+          <section className="kpi-grid">
+            <article className="metric-card metric-card-pending">
+              <div className="metric-card-header">
+                <div className="metric-icon metric-icon-pending">
+                  <Icon name="pending" />
                 </div>
-                <p className="complaint-meta">
-                  {reporterLabel(complaint)} · {titleCase(complaint.source_type)}
-                </p>
-                <p className="complaint-snippet">
-                  {complaint.note || complaint.expected_word || 'No user note provided.'}
-                </p>
-                <p className="complaint-date">Created {formatDate(complaint.created_at)}</p>
-              </button>
-            ))}
-          </div>
-        </aside>
-
-        <section className="detail-panel">
-          {!selectedComplaint ? (
-            <article className="empty-state detail-empty">
-              <h3>Select a complaint to inspect it.</h3>
-              <p>The detail panel will show reporter info, word context, and admin actions.</p>
+                <span className="metric-chip">Active</span>
+              </div>
+              <strong>{pendingCount}</strong>
+              <span>Pending</span>
+              <small>Open and reviewing complaints</small>
             </article>
-          ) : (
-            <>
-              <div className="panel-header">
-                <div>
-                  <p className="eyebrow">Complaint detail</p>
-                  <h2>{complaintHeadline(selectedComplaint)}</h2>
-                </div>
-                <span className={`status-pill status-${selectedComplaint.status}`}>
-                  {selectedComplaint.status}
-                </span>
-              </div>
 
-              <div className="detail-grid">
-                <article className="detail-card">
-                  <h3>Reporter</h3>
-                  <dl>
-                    <div>
-                      <dt>Name</dt>
-                      <dd>{selectedComplaint.reporter_name || 'Not provided'}</dd>
-                    </div>
-                    <div>
-                      <dt>Email</dt>
-                      <dd>{selectedComplaint.reporter_email || 'Not available'}</dd>
-                    </div>
-                    <div>
-                      <dt>Created</dt>
-                      <dd>{formatDate(selectedComplaint.created_at)}</dd>
-                    </div>
-                    <div>
-                      <dt>Updated</dt>
-                      <dd>{formatDate(selectedComplaint.updated_at)}</dd>
-                    </div>
-                    <div>
-                      <dt>Resolved</dt>
-                      <dd>{formatDate(selectedComplaint.resolved_at)}</dd>
-                    </div>
-                  </dl>
-                </article>
+            {(Object.keys(statusMeta) as ComplaintStatus[]).map((status) => {
+              const meta = statusMeta[status];
 
-                <article className="detail-card">
-                  <h3>Word context</h3>
-                  <dl>
-                    <div>
-                      <dt>Source</dt>
-                      <dd>{titleCase(selectedComplaint.source_type)}</dd>
+              return (
+                <article key={status} className="metric-card">
+                  <div className="metric-card-header">
+                    <div className={`metric-icon metric-icon-${status}`}>
+                      <Icon name={meta.icon} />
                     </div>
-                    <div>
-                      <dt>Reported slug</dt>
-                      <dd>{selectedComplaint.reported_word_slug || 'Not captured'}</dd>
-                    </div>
-                    <div>
-                      <dt>Expected word</dt>
-                      <dd>{selectedComplaint.expected_word || 'Not provided'}</dd>
-                    </div>
-                    <div>
-                      <dt>Dictionary word</dt>
-                      <dd>{selectedComplaint.dictionary_english_word || 'No linked entry'}</dd>
-                    </div>
-                    <div>
-                      <dt>Urdu</dt>
-                      <dd>{selectedComplaint.dictionary_urdu_word || 'No linked entry'}</dd>
-                    </div>
-                    <div>
-                      <dt>Category</dt>
-                      <dd>{selectedComplaint.dictionary_category || 'Uncategorized'}</dd>
-                    </div>
-                  </dl>
-                </article>
-
-                <article className="detail-card wide-card">
-                  <h3>User note</h3>
-                  <p>{selectedComplaint.note || 'No user note submitted.'}</p>
-                </article>
-
-                <article className="detail-card wide-card">
-                  <h3>Prediction context</h3>
-                  <dl className="prediction-grid">
-                    <div>
-                      <dt>History ID</dt>
-                      <dd>{selectedComplaint.translation_history_id || 'Not linked'}</dd>
-                    </div>
-                    <div>
-                      <dt>Predicted word</dt>
-                      <dd>{selectedComplaint.history_predicted_word_slug || 'Not linked'}</dd>
-                    </div>
-                    <div>
-                      <dt>Confidence</dt>
-                      <dd>
-                        {selectedComplaint.history_confidence != null
-                          ? `${Math.round(selectedComplaint.history_confidence * 100)}%`
-                          : 'Not captured'}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>Model version</dt>
-                      <dd>{selectedComplaint.history_model_version || 'Not captured'}</dd>
-                    </div>
-                    <div>
-                      <dt>Prediction time</dt>
-                      <dd>{formatDate(selectedComplaint.history_created_at)}</dd>
-                    </div>
-                  </dl>
-                </article>
-              </div>
-
-              <article className="detail-card editor-card">
-                <div className="panel-header">
-                  <div>
-                    <p className="eyebrow">Admin action</p>
-                    <h3>Maintain this complaint</h3>
+                    <span className="metric-chip">{metricDelta(status)}</span>
                   </div>
+                  <strong>{complaintMetrics[status]}</strong>
+                  <span>{meta.label}</span>
+                  <small>{meta.metricHint}</small>
+                </article>
+              );
+            })}
+          </section>
+
+          <section className="filter-bar panel">
+            <div className="filter-group">
+              <label>
+                Status
+                <div className="select-shell">
+                  <select
+                    onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
+                    value={statusFilter}
+                  >
+                    {statusOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <Icon name="expand_more" />
+                </div>
+              </label>
+
+              <label>
+                Source
+                <div className="select-shell">
+                  <select
+                    onChange={(event) => setSourceFilter(event.target.value as SourceFilter)}
+                    value={sourceFilter}
+                  >
+                    {sourceOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <Icon name="expand_more" />
+                </div>
+              </label>
+            </div>
+
+            <div className="filter-actions">
+              <p>{listLoading ? 'Loading complaints...' : filteredResultLabel}</p>
+              <button className="secondary-button" onClick={clearFilters} type="button">
+                Clear filters
+              </button>
+              <button
+                className="secondary-button"
+                onClick={() => setRefreshKey((value) => value + 1)}
+                type="button"
+              >
+                Refresh
+              </button>
+            </div>
+          </section>
+
+          {listError ? <p className="inline-feedback inline-feedback-error">{listError}</p> : null}
+
+          {!listLoading && complaints.length === 0 ? (
+            <section className="empty-stage">
+              <div className="empty-visual">
+                <div className="empty-visual-core">
+                  <Icon name="search_off" />
+                </div>
+                <div className="empty-visual-tag">
+                  <Icon name="filter_alt_off" />
+                </div>
+              </div>
+              <h3>No complaints found matching your filters.</h3>
+              <p>
+                Try adjusting your status or source filters. The current query did not return any
+                SignSpeak complaint records.
+              </p>
+              <div className="empty-actions">
+                <button className="primary-button" onClick={clearFilters} type="button">
+                  <span>Reset all filters</span>
+                  <Icon name="restart_alt" />
+                </button>
+                <button
+                  className="secondary-button"
+                  onClick={() => setRefreshKey((value) => value + 1)}
+                  type="button"
+                >
+                  Refresh
+                </button>
+              </div>
+            </section>
+          ) : (
+            <section className="workspace-grid">
+              <aside className="queue-panel">
+                <div className="panel-heading">
+                  <div>
+                    <p className="eyebrow">Complaint queue</p>
+                    <h3>{filteredResultLabel}</h3>
+                  </div>
+                  {listLoading ? <span className="loading-chip">Loading...</span> : null}
                 </div>
 
-                <div className="editor-grid">
-                  <label>
-                    Status
-                    <select
-                      value={statusDraft}
-                      onChange={(event) => setStatusDraft(event.target.value as ComplaintStatus)}
+                <div className="queue-list">
+                  {complaints.map((complaint) => (
+                    <button
+                      key={complaint.id}
+                      className={`queue-item ${complaint.id === selectedComplaintId ? 'queue-item-active' : ''}`}
+                      onClick={() => setSelectedComplaintId(complaint.id)}
+                      type="button"
                     >
-                      {statusOptions
-                        .filter((option) => option.value !== 'all')
-                        .map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                    </select>
-                  </label>
-
-                  <label className="full-width">
-                    Admin note
-                    <textarea
-                      value={adminNoteDraft}
-                      onChange={(event) => setAdminNoteDraft(event.target.value)}
-                      placeholder="Add the reason for your decision, investigation results, or next steps."
-                      rows={6}
-                    />
-                  </label>
+                      <div className="queue-item-meta">
+                        <span className="queue-item-id">#{complaint.id.slice(0, 8)}</span>
+                        <span>{formatRelativeDate(complaint.created_at)}</span>
+                      </div>
+                      <h4>{complaintHeadline(complaint)}</h4>
+                      <p>{complaintSnippet(complaint)}</p>
+                      <div className="queue-item-footer">
+                        <span>{reporterLabel(complaint)}</span>
+                        <StatusBadge status={complaint.status} />
+                      </div>
+                    </button>
+                  ))}
                 </div>
+              </aside>
+              <section className="detail-panel">
+                {!selectedComplaint ? (
+                  <article className="detail-empty panel">
+                    <h3>Select a complaint to inspect it.</h3>
+                    <p>The detail panel will show reporter context, word context, and admin actions.</p>
+                  </article>
+                ) : (
+                  <>
+                    <div className="detail-header">
+                      <div>
+                        <div className="detail-header-row">
+                          <h3>Complaint ID: #{selectedComplaint.id.slice(0, 8)}</h3>
+                          <StatusBadge status={selectedComplaint.status} />
+                        </div>
+                        <p>
+                          Initiated on {formatDate(selectedComplaint.created_at)} • Priority{' '}
+                          {complaintPriority(selectedComplaint.status)}
+                        </p>
+                      </div>
+                      <div className="detail-header-actions">
+                        <button
+                          className="secondary-button"
+                          onClick={() => setRefreshKey((value) => value + 1)}
+                          type="button"
+                        >
+                          Refresh record
+                        </button>
+                      </div>
+                    </div>
 
-                <div className="editor-actions">
-                  <button onClick={saveComplaint} disabled={saveBusy}>
-                    {saveBusy ? 'Saving...' : 'Save changes'}
-                  </button>
-                  {saveError ? <p className="error-banner inline-banner">{saveError}</p> : null}
-                  {saveNotice ? <p className="notice-banner inline-banner">{saveNotice}</p> : null}
-                </div>
-              </article>
-            </>
+                    <div className="detail-layout">
+                      <div className="detail-main">
+                        <article className="visual-card panel">
+                          <div className="visual-stage">
+                            <div className="visual-gradient" />
+                            <div className="visual-badge">Reported sign</div>
+                            <div className="visual-chip-row">
+                              <span className="visual-chip">{complaintHeadline(selectedComplaint)}</span>
+                              {selectedComplaint.expected_word ? (
+                                <span className="visual-chip visual-chip-secondary">
+                                  Expected: {selectedComplaint.expected_word}
+                                </span>
+                              ) : null}
+                            </div>
+                            <div className="visual-icon-wrap">
+                              <Icon name={sourceMeta[selectedComplaint.source_type].icon} />
+                            </div>
+                          </div>
+
+                          <div className="visual-copy">
+                            <p className="eyebrow">User note</p>
+                            <blockquote>
+                              {selectedComplaint.note ||
+                                'No user note was submitted with this complaint.'}
+                            </blockquote>
+                          </div>
+                        </article>
+
+                        <div className="insight-grid">
+                          <article className="insight-card">
+                            <div className="insight-heading">
+                              <div className="metric-icon metric-icon-reviewing">
+                                <Icon name="analytics" />
+                              </div>
+                              <span>Confidence score</span>
+                            </div>
+                            <strong>{confidenceLabel(selectedComplaint.history_confidence)}</strong>
+                            <div className="progress-track">
+                              <div
+                                className="progress-value"
+                                style={{
+                                  width: `${selectedComplaint.history_confidence ? Math.round(selectedComplaint.history_confidence * 100) : 0}%`,
+                                }}
+                              />
+                            </div>
+                          </article>
+
+                          <article className="insight-card">
+                            <div className="insight-heading">
+                              <div className="metric-icon metric-icon-pending">
+                                <Icon name="label" />
+                              </div>
+                              <span>Predicted label</span>
+                            </div>
+                            <strong>{selectedComplaint.history_predicted_word_slug || 'Unavailable'}</strong>
+                            <small>Model version: {modelVersionLabel(selectedComplaint.history_model_version)}</small>
+                          </article>
+                        </div>
+
+                        <div className="context-grid">
+                          <article className="context-card panel">
+                            <p className="eyebrow">Word context</p>
+                            <dl>
+                              <div>
+                                <dt>Source</dt>
+                                <dd>{sourceMeta[selectedComplaint.source_type].label}</dd>
+                              </div>
+                              <div>
+                                <dt>Reported slug</dt>
+                                <dd>{selectedComplaint.reported_word_slug || 'Not captured'}</dd>
+                              </div>
+                              <div>
+                                <dt>Expected word</dt>
+                                <dd>{selectedComplaint.expected_word || 'Not provided'}</dd>
+                              </div>
+                              <div>
+                                <dt>Dictionary word</dt>
+                                <dd>{selectedComplaint.dictionary_english_word || 'No linked entry'}</dd>
+                              </div>
+                              <div>
+                                <dt>Urdu</dt>
+                                <dd>{selectedComplaint.dictionary_urdu_word || 'No linked entry'}</dd>
+                              </div>
+                              <div>
+                                <dt>Category</dt>
+                                <dd>{selectedComplaint.dictionary_category || 'Uncategorized'}</dd>
+                              </div>
+                            </dl>
+                          </article>
+
+                          <article className="context-card panel">
+                            <p className="eyebrow">Prediction context</p>
+                            <dl>
+                              <div>
+                                <dt>History ID</dt>
+                                <dd>{selectedComplaint.translation_history_id || 'Not linked'}</dd>
+                              </div>
+                              <div>
+                                <dt>Predicted word</dt>
+                                <dd>{selectedComplaint.history_predicted_word_slug || 'Not linked'}</dd>
+                              </div>
+                              <div>
+                                <dt>Confidence</dt>
+                                <dd>{confidenceLabel(selectedComplaint.history_confidence)}</dd>
+                              </div>
+                              <div>
+                                <dt>Model version</dt>
+                                <dd>{modelVersionLabel(selectedComplaint.history_model_version)}</dd>
+                              </div>
+                              <div>
+                                <dt>Prediction time</dt>
+                                <dd>{formatDate(selectedComplaint.history_created_at)}</dd>
+                              </div>
+                              <div>
+                                <dt>Resolved</dt>
+                                <dd>{formatDate(selectedComplaint.resolved_at)}</dd>
+                              </div>
+                            </dl>
+                          </article>
+                        </div>
+                      </div>
+
+                      <aside className="detail-side">
+                        <article className="reporter-card panel">
+                          <p className="eyebrow">Reporter information</p>
+                          <div className="reporter-identity">
+                            <div className="reporter-avatar">{initialsFor(selectedComplaint)}</div>
+                            <div>
+                              <strong>{reporterLabel(selectedComplaint)}</strong>
+                              <span>{selectedComplaint.reporter_id}</span>
+                            </div>
+                          </div>
+                          <dl>
+                            <div>
+                              <dt>Email</dt>
+                              <dd>{selectedComplaint.reporter_email || 'Not available'}</dd>
+                            </div>
+                            <div>
+                              <dt>Status</dt>
+                              <dd>{role === 'admin' ? 'Verified admin review' : 'Unknown'}</dd>
+                            </div>
+                            <div>
+                              <dt>Complaint source</dt>
+                              <dd>{sourceMeta[selectedComplaint.source_type].label}</dd>
+                            </div>
+                            <div>
+                              <dt>Last updated</dt>
+                              <dd>{formatDate(selectedComplaint.updated_at)}</dd>
+                            </div>
+                          </dl>
+                        </article>
+
+                        <article className="resolution-card panel">
+                          <p className="eyebrow">Admin resolution</p>
+
+                          <label>
+                            Update status
+                            <div className="select-shell">
+                              <select
+                                onChange={(event) =>
+                                  setStatusDraft(event.target.value as ComplaintStatus)
+                                }
+                                value={statusDraft}
+                              >
+                                {statusOptions
+                                  .filter((option) => option.value !== 'all')
+                                  .map((option) => (
+                                    <option key={option.value} value={option.value}>
+                                      {option.label}
+                                    </option>
+                                  ))}
+                              </select>
+                              <Icon name="expand_more" />
+                            </div>
+                          </label>
+
+                          <label>
+                            Internal admin notes
+                            <textarea
+                              onChange={(event) => setAdminNoteDraft(event.target.value)}
+                              placeholder="Add notes about the resolution, investigation, or follow-up."
+                              rows={6}
+                              value={adminNoteDraft}
+                            />
+                          </label>
+
+                          <div className="resolution-actions">
+                            <button
+                              className="primary-button"
+                              disabled={saveBusy}
+                              onClick={saveComplaint}
+                              type="button"
+                            >
+                              <span>{saveBusy ? 'Saving...' : 'Save changes'}</span>
+                              <Icon name="save" />
+                            </button>
+                            <button className="secondary-button" onClick={clearFilters} type="button">
+                              Reset view
+                            </button>
+                          </div>
+
+                          {saveError ? (
+                            <p className="inline-feedback inline-feedback-error">{saveError}</p>
+                          ) : null}
+                          {saveNotice ? (
+                            <p className="inline-feedback inline-feedback-success">{saveNotice}</p>
+                          ) : null}
+                        </article>
+                      </aside>
+                    </div>
+                  </>
+                )}
+              </section>
+            </section>
           )}
-        </section>
-      </section>
-    </main>
+        </main>
+      </div>
+    </div>
   );
 }

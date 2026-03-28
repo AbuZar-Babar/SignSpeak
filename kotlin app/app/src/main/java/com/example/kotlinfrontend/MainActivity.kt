@@ -668,7 +668,7 @@ fun LiveCameraScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF8FAF5)),
+            .background(Color(0xFFF7FBF1)),
         verticalArrangement = Arrangement.spacedBy(0.dp)
     ) {
 
@@ -722,8 +722,8 @@ fun LiveCameraScreen(
                 .fillMaxWidth()
                 .weight(1f)
                 .padding(horizontal = 12.dp)
-                .clip(RoundedCornerShape(28.dp))
-                .background(Color(0xFF0B1623))
+                .clip(RoundedCornerShape(32.dp))
+                .background(Color(0xFF747C71))
         ) {
             if (hasPermission) {
                 AndroidView(
@@ -768,8 +768,8 @@ fun LiveCameraScreen(
                     FilledTonalIconButton(
                         onClick = { useFrontCamera = !useFrontCamera },
                         colors = IconButtonDefaults.filledTonalIconButtonColors(
-                            containerColor = Color(0xCC1C1C1E),
-                            contentColor   = Color.White
+                            containerColor = Color(0xF2FFFCF5),
+                            contentColor   = Color(0xFF1F5100)
                         )
                     ) {
                         Icon(Icons.Rounded.Cameraswitch, contentDescription = "Flip camera")
@@ -779,8 +779,8 @@ fun LiveCameraScreen(
                         FilledTonalIconButton(
                             onClick = { torchEnabled = !torchEnabled },
                             colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                containerColor = if (torchEnabled) Color(0xFFFFC800) else Color(0xCC1C1C1E),
-                                contentColor   = if (torchEnabled) Color(0xFF1A1A1A) else Color.White
+                                containerColor = if (torchEnabled) Color(0xFFFCD400) else Color(0xF2FFFCF5),
+                                contentColor   = Color(0xFF1F5100)
                             )
                         ) {
                             Icon(
@@ -930,8 +930,8 @@ fun LiveCameraScreen(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
                 .padding(bottom = 12.dp),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFF0F5EB)),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
             Column {
@@ -948,12 +948,19 @@ fun LiveCameraScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Icon(Icons.Rounded.Settings, contentDescription = null, tint = Color(0xFF58CC02))
-                        Text(
-                            "Settings",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFF1A1A1A)
-                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                "Model Options",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(0xFF1A1A1A)
+                            )
+                            Text(
+                                "Choose translation model",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF6B7280)
+                            )
+                        }
                     }
                     IconButton(onClick = { settingsExpanded = !settingsExpanded }) {
                         Icon(
@@ -976,7 +983,8 @@ fun LiveCameraScreen(
                     ) {
 
                         // ── Camera section ─────────────────────────────────
-                        SettingsSectionLabel("Camera")
+                        if (false) {
+                            SettingsSectionLabel("Camera")
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -1002,6 +1010,7 @@ fun LiveCameraScreen(
                                 onCheckedChange = { torchEnabled = it }
                             )
                         }
+                        }
 
                         // ── Model quality section ──────────────────────────
                         SettingsSectionLabel("Model Quality")
@@ -1024,7 +1033,8 @@ fun LiveCameraScreen(
                         }
 
                         // ── Capture speed section ──────────────────────────
-                        SettingsSectionLabel("Capture Speed — $targetCaptureFps FPS")
+                        if (false) {
+                            SettingsSectionLabel("Capture Speed — $targetCaptureFps FPS")
                         Slider(
                             value = targetCaptureFps.toFloat(),
                             onValueChange = { rawValue ->
@@ -1041,6 +1051,7 @@ fun LiveCameraScreen(
                                 inactiveTrackColor = Color(0xFFE2E8F0)
                             )
                         )
+                        }
 
                         // ── Dev-only section (non-product mode) ───────────
                         if (!productMode) {
@@ -1117,10 +1128,10 @@ private fun CameraOptionChip(
     Button(
         onClick = onClick,
         modifier = modifier,
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = if (selected) Color(0xFF58CC02) else Color(0xFFF1F5F9),
-            contentColor   = if (selected) Color.White      else Color(0xFF374151)
+            containerColor = if (selected) Color(0xFF58CC02) else Color(0xFFF7FBF1),
+            contentColor   = if (selected) Color.White else Color(0xFF1F2937)
         ),
         elevation = ButtonDefaults.buttonElevation(
             defaultElevation = if (selected) 2.dp else 0.dp
@@ -1129,7 +1140,7 @@ private fun CameraOptionChip(
         Text(
             text = label,
             style = androidx.compose.material3.MaterialTheme.typography.labelLarge,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
         )
     }
 }
@@ -1178,7 +1189,7 @@ private fun SettingsToggleRow(
                 checkedThumbColor = Color.White,
                 checkedTrackColor = Color(0xFF58CC02),
                 uncheckedThumbColor = Color.White,
-                uncheckedTrackColor = Color(0xFFD1D5DB)
+                uncheckedTrackColor = Color(0xFFE2E8D8)
             )
         )
     }

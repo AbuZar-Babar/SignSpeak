@@ -2,9 +2,11 @@ package com.example.kotlinfrontend.ui.history
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.kotlinfrontend.data.model.DictionaryEntry
 import com.example.kotlinfrontend.data.model.SessionState
 import com.example.kotlinfrontend.data.model.TranslationHistoryItem
 import com.example.kotlinfrontend.data.repository.AuthRepository
+import com.example.kotlinfrontend.data.repository.DictionaryRepository
 import com.example.kotlinfrontend.data.repository.HistoryRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,12 +18,14 @@ import kotlinx.coroutines.launch
 data class HistoryUiState(
     val sessionState: SessionState = SessionState.initializing(isConfigured = false),
     val items: List<TranslationHistoryItem> = emptyList(),
+    val translationLookup: Map<String, DictionaryEntry> = emptyMap(),
     val isLoading: Boolean = true,
     val message: String? = null
 )
 
 class HistoryViewModel(
     private val authRepository: AuthRepository,
+    private val dictionaryRepository: DictionaryRepository,
     private val historyRepository: HistoryRepository
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(HistoryUiState())
@@ -51,9 +55,19 @@ class HistoryViewModel(
                 return@launch
             }
 
+            val translations = items
+                .map { it.predictedWordSlug }
+                .distinct()
+                .associateWith { slug ->
+                    runCatching { dictionaryRepository.getEntry(slug) }.getOrNull()
+                }
+                .mapNotNull { (slug, entry) -> entry?.let { slug to it } }
+                .toMap()
+
             _uiState.update { current ->
                 current.copy(
                     items = items,
+                    translationLookup = translations,
                     isLoading = false
                 )
             }
