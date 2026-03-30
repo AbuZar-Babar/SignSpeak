@@ -23,7 +23,6 @@ MODEL_ARTIFACTS = {
 
 
 def convert_to_tflite(model: tf.keras.Model, quantize: bool = False) -> bytes:
-    # Use from_keras_model which is safer for Keras 3 / recent TF versions
     converter = tf.lite.TFLiteConverter.from_keras_model(model)
     converter.target_spec.supported_ops = [
         tf.lite.OpsSet.TFLITE_BUILTINS, 
@@ -33,8 +32,6 @@ def convert_to_tflite(model: tf.keras.Model, quantize: bool = False) -> bytes:
     converter.experimental_enable_resource_variables = True
     converter.experimental_enable_resource_variables = True
     if quantize:
-        # Dynamic-range quantization keeps float I/O for app compatibility
-        # while reducing weights and improving CPU throughput on many devices.
         converter.optimizations = [tf.lite.Optimize.DEFAULT]
     return converter.convert()
 

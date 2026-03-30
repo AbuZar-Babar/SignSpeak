@@ -210,8 +210,8 @@ def print_comparison(b_res, a_res):
     print(f"  {'Latency (ms)':<25} {b_res['latency']:>11.2f}  {a_res['latency']:>11.2f}  {a_res['latency'] - b_res['latency']:>+11.2f}")
     
     acc_delta = a_acc - b_acc
-    
-    print(f"\n  🏆 VERDICT")
+
+    print(f"\nVERDICT")
     print(f"  {'─'*61}")
     if acc_delta > 1.0:
         print(f"  Augmentation improved accuracy by {acc_delta:.2f}%.")
@@ -227,7 +227,7 @@ def print_comparison(b_res, a_res):
 
 def main():
     print("\n" + "=" * 70)
-    print("  SignSpeak – Model Evaluation Suite")
+    print("  SignSpeak - Model Evaluation Suite")
     print(f"  Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"  Method: Held-out test set ({TEST_SIZE*100:.0f}%, stratified, seed={RANDOM_STATE})")
     print("=" * 70)

@@ -1,27 +1,3 @@
-"""
-train_combined.py
-=================
-Unified training script – merges MP_Data + MP_Data_mobile, then trains
-both a baseline and an augmented model (same as the old compare_models.py).
-
-Before training:
-  - Current production models are MOVED into the `original/` folder
-    so they are never deleted or overwritten.
-
-After training:
-  - New models are written to ml_pipeline_data_collection/ (same files
-    api_server.py already points to).
-  - A comparison report is saved to comparison_reports/.
-
-Usage
------
-    # Quick sanity-check (2 epochs):
-    python train_combined.py --epochs 2
-
-    # Full run (EPOCHS from actions_config, default 200):
-    python train_combined.py
-"""
-
 import os
 import shutil
 import time
@@ -46,7 +22,6 @@ from actions_config import (
 from data_augmentation import create_augmented_dataset
 from training_logger import log_training_session, log_comparison_session
 
-# -- Output Paths --
 MODEL_DIR = "all_models"
 MODEL_BASELINE    = os.path.join(MODEL_DIR, "action_model_baseline_new.h5")
 MODEL_AUGMENTED   = os.path.join(MODEL_DIR, "action_model_augmented_new.h5")
@@ -65,7 +40,7 @@ def load_combined_data(actions, data_sources):
     for source_dir in data_sources:
         name = os.path.basename(source_dir)
         if not os.path.isdir(source_dir):
-            print(f"{name} not found – skipping")
+            print(f"{name} not found - skipping")
             continue
         print(f"\n{name}")
         source_count = 0
@@ -97,7 +72,7 @@ def load_combined_data(actions, data_sources):
         print(f"→ {source_count} from {name}")
 
     if not sequences:
-        raise RuntimeError("No sequences loaded - check MP_Data / MP_Dat_mobile.")
+        raise RuntimeError("No sequences loaded - check MP_Data / MP_Data_mobile.")
 
     X, y = np.array(sequences), np.array(labels)
     print(f"\nCombined: {len(X)} sequences, {X.shape[2]} features/frame")
@@ -156,7 +131,7 @@ def train_and_evaluate(actions, data_sources, use_augmentation,
                           min_lr=1e-6, verbose=1),
     ]
 
-    print(f"\n🚀 Training for up to {epochs} epochs...")
+    print(f"\nTraining for up to {epochs} epochs...")
     t0 = time.time()
     history = model.fit(
         X_train, y_train,

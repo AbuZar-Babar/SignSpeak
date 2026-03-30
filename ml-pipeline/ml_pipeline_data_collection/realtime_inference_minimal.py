@@ -1,4 +1,3 @@
-# realtime_inference_minimal.py
 import cv2
 import numpy as np
 import tensorflow as tf

@@ -1,17 +1,3 @@
-"""
-Data Augmentation Module for Sign Language Landmark Sequences
-
-This module provides augmentation techniques specifically designed for
-MediaPipe landmark data (spatial-temporal sequences).
-
-Key Features:
-- Time warping (speed variations)
-- Spatial transformations (scaling, rotation, translation)
-- Noise injection
-- Horizontal flipping
-- Temporal cropping
-"""
-
 import numpy as np
 from scipy.interpolate import interp1d
 
