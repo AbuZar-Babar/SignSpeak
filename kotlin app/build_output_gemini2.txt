@@ -1,0 +1,44 @@
+﻿> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app:generateDebugBuildConfig UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:processDebugNavigationResources
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :app:javaPreCompileDebug
+> Task :app:parseDebugLocalResources
+> Task :app:mergeDebugAssets
+> Task :app:generateDebugRFile
+> Task :app:compressDebugAssets
+> Task :app:checkDebugDuplicateClasses
+> Task :app:desugarDebugFileDependencies
+> Task :app:compileDebugKotlin
+> Task :app:mergeExtDexDebug
+
+> Task :app:compileDebugKotlin
+w: file:///C:/Users/AbuZar/Desktop/Fyp/signspeak/SignSpeak/kotlin%20app/app/src/main/java/com/example/kotlinfrontend/HandExtractor.kt:216:43 'fun handednesses(): (Mutable)List<(Mutable)List<Category!>!>!' is deprecated. Deprecated in Java.
+w: file:///C:/Users/AbuZar/Desktop/Fyp/signspeak/SignSpeak/kotlin%20app/app/src/main/java/com/example/kotlinfrontend/HandExtractor.kt:217:20 'fun handednesses(): (Mutable)List<(Mutable)List<Category!>!>!' is deprecated. Deprecated in Java.
+w: file:///C:/Users/AbuZar/Desktop/Fyp/signspeak/SignSpeak/kotlin%20app/app/src/main/java/com/example/kotlinfrontend/HandExtractor.kt:249:43 'fun handednesses(): (Mutable)List<(Mutable)List<Category!>!>!' is deprecated. Deprecated in Java.
+w: file:///C:/Users/AbuZar/Desktop/Fyp/signspeak/SignSpeak/kotlin%20app/app/src/main/java/com/example/kotlinfrontend/HandExtractor.kt:250:20 'fun handednesses(): (Mutable)List<(Mutable)List<Category!>!>!' is deprecated. Deprecated in Java.
+w: file:///C:/Users/AbuZar/Desktop/Fyp/signspeak/SignSpeak/kotlin%20app/app/src/main/java/com/example/kotlinfrontend/MainActivity.kt:160:26 'val LocalLifecycleOwner: ProvidableCompositionLocal<LifecycleOwner>' is deprecated. Moved to lifecycle-runtime-compose library in androidx.lifecycle.compose package.
+w: file:///C:/Users/AbuZar/Desktop/Fyp/signspeak/SignSpeak/kotlin%20app/app/src/main/java/com/example/kotlinfrontend/MainActivity.kt:445:26 'fun setTargetResolution(p0: Size): ImageAnalysis.Builder' is deprecated. Deprecated in Java.
+w: file:///C:/Users/AbuZar/Desktop/Fyp/signspeak/SignSpeak/kotlin%20app/app/src/main/java/com/example/kotlinfrontend/ui/dictionary/DictionaryScreen.kt:318:36 'val Icons.Rounded.OpenInNew: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Rounded.OpenInNew.
+w: file:///C:/Users/AbuZar/Desktop/Fyp/signspeak/SignSpeak/kotlin%20app/app/src/main/java/com/example/kotlinfrontend/ui/learn/DictionaryScreen.kt:66:43 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///C:/Users/AbuZar/Desktop/Fyp/signspeak/SignSpeak/kotlin%20app/app/src/main/java/com/example/kotlinfrontend/ui/profile/ProfileScreen.kt:147:46 'val Icons.Rounded.Logout: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Rounded.Logout.
+
+> Task :app:compileDebugJavaWithJavac
+> Task :app:processDebugJavaRes
+> Task :app:mergeLibDexDebug
+> Task :app:checkDebugAarMetadata
+> Task :app:compileDebugNavigationResources
+> Task :app:mapDebugSourceSetPaths
+> Task :app:createDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksDebug
+> Task :app:processDebugMainManifest
+> Task :app:processDebugManifest
+> Task :app:mergeDebugJniLibFolders
+> Task :app:mergeDebugResources
+> Task :app:processDebugManifestForPackage
+> Task :app:mergeDebugNativeLibs
+> Task :app:mergeDebugJavaResource

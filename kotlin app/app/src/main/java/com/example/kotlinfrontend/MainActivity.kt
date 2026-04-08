@@ -84,6 +84,8 @@ import androidx.core.content.ContextCompat
 import com.example.kotlinfrontend.app.SignSpeakApp
 import com.example.kotlinfrontend.ui.theme.KotlinFrontendTheme
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -98,6 +100,7 @@ import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.roundToInt
 
 import com.example.kotlinfrontend.ui.root.SignSpeakRoot
+import com.example.kotlinfrontend.BuildConfig
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -224,6 +227,23 @@ fun LiveCameraScreen(
     var isBackendChecking by remember { mutableStateOf(false) }
     var didLoadSavedBackendUrl by remember { mutableStateOf(false) }
     var lastObservedCommitCount by remember { mutableIntStateOf(0) }
+
+    // ── Smart Sentences (Gemini LLM) ──────────────────────────────────────────
+    var sentenceModeEnabled by remember { mutableStateOf(true) }
+    var sentenceLanguage by remember { mutableStateOf(SentenceLanguage.BOTH) }
+    var formedSentence by remember { mutableStateOf("") }
+    var isSentenceLoading by remember { mutableStateOf(false) }
+    var sentenceError by remember { mutableStateOf(false) }
+    val sentenceWordThreshold = 3
+    var sentenceDebounceJob by remember { mutableStateOf<Job?>(null) }
+    val geminiSentenceFormer = remember {
+        val apiKey = BuildConfig.GEMINI_API_KEY.trim()
+        if (apiKey.isBlank()) {
+            null
+        } else {
+            runCatching { GeminiSentenceFormer(apiKey) }.getOrNull()
+        }
+    }
 
     // Sync torch whenever torchEnabled changes
     LaunchedEffect(torchEnabled) {
@@ -486,6 +506,29 @@ fun LiveCameraScreen(
                                             Instant.now().toString()
                                         )
                                     }
+
+                                    // ── Trigger Gemini sentence formation ────
+                                    if (sentenceModeEnabled &&
+                                        geminiSentenceFormer != null &&
+                                        liveState.commitCount >= sentenceWordThreshold
+                                    ) {
+                                        val currentWords = liveState.transcript
+                                            .split(" ")
+                                            .filter { it.isNotBlank() }
+                                        sentenceDebounceJob?.cancel()
+                                        sentenceDebounceJob = coroutineScope.launch {
+                                            delay(800L)
+                                            isSentenceLoading = true
+                                            sentenceError = false
+                                            val result = geminiSentenceFormer.formSentence(
+                                                words = currentWords,
+                                                language = sentenceLanguage
+                                            )
+                                            formedSentence = result.formedSentence
+                                            sentenceError = result.isError
+                                            isSentenceLoading = false
+                                        }
+                                    }
                                 }
 
                                 liveState.rawPrediction?.let { prediction ->
@@ -622,6 +665,9 @@ fun LiveCameraScreen(
         if (savedBackendUrl.isNotBlank()) {
             refreshBackendHealth(updateStatusText = false)
         }
+        // Load saved sentence mode preferences
+        sentenceModeEnabled = backendSettingsRepository.sentenceModeEnabledFlow.first()
+        sentenceLanguage = backendSettingsRepository.sentenceLanguageFlow.first()
     }
 
     LaunchedEffect(hasPermission, inferenceMode, selectedModel, performanceMode, useQuantizedModel, activeBackendUrl, useFrontCamera) {
@@ -857,6 +903,10 @@ fun LiveCameraScreen(
                                         onClick = {
                                             liveEngineRef.get()?.clearTranscript()
                                             transcript = ""
+                                            formedSentence = ""
+                                            sentenceError = false
+                                            isSentenceLoading = false
+                                            sentenceDebounceJob?.cancel()
                                             lastObservedCommitCount = 0
                                         },
                                         contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)
@@ -870,6 +920,71 @@ fun LiveCameraScreen(
                                         },
                                         contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)
                                     ) { Text("Report", color = Color(0xFF94A3B8)) }
+                                }
+                            }
+                        }
+
+                        // ── Formed sentence card (Gemini) ──────────────────
+                        if (sentenceModeEnabled && (formedSentence.isNotBlank() || isSentenceLoading)) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 4.dp)
+                                    .background(
+                                        color = Color(0x33FFFFFF),
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+                                    .padding(horizontal = 10.dp, vertical = 8.dp)
+                            ) {
+                                if (isSentenceLoading) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        LinearProgressIndicator(
+                                            modifier = Modifier
+                                                .width(48.dp)
+                                                .height(3.dp)
+                                                .clip(RoundedCornerShape(10.dp)),
+                                            color = Color(0xFFFCD400),
+                                            trackColor = Color(0x33FFFFFF)
+                                        )
+                                        Text(
+                                            text = "Forming sentence…",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = Color(0xFFCCE5FF)
+                                        )
+                                    }
+                                } else {
+                                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "✨ AI Sentence",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFFFCD400)
+                                            )
+                                            if (sentenceError) {
+                                                Text(
+                                                    text = "(fallback)",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = Color(0xFF94A3B8)
+                                                )
+                                            }
+                                        }
+                                        Text(
+                                            text = formedSentence,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Medium,
+                                            color = Color.White,
+                                            maxLines = 3,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1010,6 +1125,85 @@ fun LiveCameraScreen(
                                 onCheckedChange = { torchEnabled = it }
                             )
                         }
+                        }
+
+                        // ── Smart Sentences section ─────────────────────────
+                        SettingsSectionLabel("Smart Sentences")
+                        SettingsToggleRow(
+                            label = "AI Sentence Formation",
+                            description = "Use Gemini AI to form natural sentences from detected words",
+                            checked = sentenceModeEnabled,
+                            onCheckedChange = { enabled ->
+                                sentenceModeEnabled = enabled
+                                coroutineScope.launch {
+                                    backendSettingsRepository.saveSentenceModeEnabled(enabled)
+                                }
+                                if (!enabled) {
+                                    formedSentence = ""
+                                    isSentenceLoading = false
+                                    sentenceDebounceJob?.cancel()
+                                }
+                            }
+                        )
+                        AnimatedVisibility(
+                            visible = sentenceModeEnabled,
+                            enter = expandVertically() + fadeIn(),
+                            exit = shrinkVertically() + fadeOut()
+                        ) {
+                            Column(
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = "Output Language",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color(0xFF6B7280)
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    SentenceLanguage.entries.forEach { lang ->
+                                        CameraOptionChip(
+                                            label = lang.displayName,
+                                            selected = sentenceLanguage == lang,
+                                            modifier = Modifier.weight(1f),
+                                            onClick = {
+                                                sentenceLanguage = lang
+                                                coroutineScope.launch {
+                                                    backendSettingsRepository.saveSentenceLanguage(lang)
+                                                }
+                                                // Re-trigger sentence with new language if we have words
+                                                if (formedSentence.isNotBlank() && geminiSentenceFormer != null) {
+                                                    val currentWords = transcript
+                                                        .split(" ")
+                                                        .filter { it.isNotBlank() }
+                                                    if (currentWords.size >= sentenceWordThreshold) {
+                                                        sentenceDebounceJob?.cancel()
+                                                        sentenceDebounceJob = coroutineScope.launch {
+                                                            isSentenceLoading = true
+                                                            sentenceError = false
+                                                            val result = geminiSentenceFormer.formSentence(
+                                                                words = currentWords,
+                                                                language = lang
+                                                            )
+                                                            formedSentence = result.formedSentence
+                                                            sentenceError = result.isError
+                                                            isSentenceLoading = false
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        )
+                                    }
+                                }
+                                if (geminiSentenceFormer == null) {
+                                    Text(
+                                        text = "Gemini AI unavailable on this build. Check API key and dependency setup.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color(0xFFB91C1C)
+                                    )
+                                }
+                            }
                         }
 
                         // ── Model quality section ──────────────────────────
