@@ -18,17 +18,24 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoStories
+import androidx.compose.material.icons.rounded.Logout
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.SignLanguage
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -40,6 +47,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import kotlinx.coroutines.launch
 import com.example.kotlinfrontend.app.AppContainer
 import com.example.kotlinfrontend.ui.components.AppBackground
 import com.example.kotlinfrontend.ui.dictionary.DictionaryScreen
@@ -61,58 +69,172 @@ enum class MainTab(
 ) {
     Translate("translate", "Translate", Icons.Rounded.SignLanguage),
     Dictionary("dictionary", "Dictionary", Icons.Rounded.AutoStories),
-    History("history", "History", Icons.Rounded.History),
-    Profile("profile", "Profile", Icons.Rounded.Person)
+    History("history", "History", Icons.Rounded.History)
 }
+
+private const val ProfileRoute = "profile"
 
 @Composable
 fun MainScaffold(container: AppContainer) {
     val navController = rememberNavController()
     val layoutSpec = rememberResponsiveLayoutSpec()
+    val drawerState = androidx.compose.material3.rememberDrawerState(
+        initialValue = androidx.compose.material3.DrawerValue.Closed
+    )
+    val scope = rememberCoroutineScope()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
-    val currentTab = MainTab.entries.firstOrNull { it.route == currentRoute } ?: MainTab.Translate
+    val currentTab = MainTab.entries.firstOrNull { it.route == currentRoute }
+    var drawerModelOptionsContent by remember {
+        mutableStateOf<(@Composable () -> Unit)?>(null)
+    }
 
-    AppBackground {
-        Scaffold(
-            modifier = Modifier.fillMaxSize(),
-            containerColor = Color.Transparent,
-            contentWindowInsets = WindowInsets(0, 0, 0, 0),
-            bottomBar = {
-                LivingBridgeBottomBar(
-                    currentTab = currentTab,
-                    maxWidth = layoutSpec.contentMaxWidth,
-                    onTabSelected = { tab ->
-                        navController.navigate(tab.route) {
-                            launchSingleTop = true
-                            restoreState = true
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
-                            }
-                        }
-                    }
-                )
-            }
-        ) { innerPadding ->
-            NavHost(
-                navController = navController,
-                startDestination = MainTab.Translate.route,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-            ) {
-                composable(MainTab.Translate.route) { TranslateScreen(container = container) }
-                composable(MainTab.Dictionary.route) { DictionaryScreen(container = container) }
-                composable(MainTab.History.route) { HistoryScreen(container = container) }
-                composable(MainTab.Profile.route) { ProfileScreen(container = container) }
+    fun openDrawer() {
+        scope.launch { drawerState.open() }
+    }
+
+    fun closeDrawer() {
+        scope.launch { drawerState.close() }
+    }
+
+    fun navigateTo(route: String) {
+        navController.navigate(route) {
+            launchSingleTop = true
+            restoreState = true
+            popUpTo(navController.graph.findStartDestination().id) {
+                saveState = true
             }
         }
     }
+
+    AppBackground {
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            drawerContent = {
+                ModalDrawerSheet {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 20.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            text = "Menu",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = BrandPrimaryDark,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        NavigationDrawerItem(
+                            label = { Text("Profile") },
+                            selected = currentRoute == ProfileRoute,
+                            onClick = {
+                                navigateTo(ProfileRoute)
+                                closeDrawer()
+                            },
+                            icon = {
+                                Icon(
+                                    imageVector = Icons.Rounded.Person,
+                                    contentDescription = null
+                                )
+                            }
+                        )
+
+                        NavigationDrawerItem(
+                            label = { Text("Sign out") },
+                            selected = false,
+                            onClick = {
+                                scope.launch {
+                                    container.authRepository.signOut()
+                                }
+                                closeDrawer()
+                            },
+                            icon = {
+                                Icon(
+                                    imageVector = Icons.Rounded.Logout,
+                                    contentDescription = null
+                                )
+                            }
+                        )
+
+                        Text(
+                            text = "Model Options",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = BrandInk,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)
+                        )
+
+                        if (drawerModelOptionsContent != null) {
+                            drawerModelOptionsContent?.invoke()
+                        } else {
+                            Text(
+                                text = "Open Translate to adjust model settings.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = BrandMuted
+                            )
+                        }
+                    }
+                }
+            }
+        ) {
+            Scaffold(
+                modifier = Modifier.fillMaxSize(),
+                containerColor = Color.Transparent,
+                contentWindowInsets = WindowInsets(0, 0, 0, 0),
+                bottomBar = {
+                    LivingBridgeBottomBar(
+                        currentTab = currentTab,
+                        maxWidth = layoutSpec.contentMaxWidth,
+                        onTabSelected = { tab ->
+                            navigateTo(tab.route)
+                        }
+                    )
+                }
+            ) { innerPadding ->
+                NavHost(
+                    navController = navController,
+                    startDestination = MainTab.Translate.route,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                ) {
+                    composable(MainTab.Translate.route) {
+                        TranslateScreen(
+                            container = container,
+                            onAvatarClick = ::openDrawer,
+                            onModelOptionsContentChange = { content ->
+                                drawerModelOptionsContent = content
+                            }
+                        )
+                    }
+                    composable(MainTab.Dictionary.route) {
+                        DictionaryScreen(
+                            container = container,
+                            onAvatarClick = ::openDrawer
+                        )
+                    }
+                    composable(MainTab.History.route) {
+                        HistoryScreen(
+                            container = container,
+                            onAvatarClick = ::openDrawer
+                        )
+                    }
+                    composable(ProfileRoute) {
+                        ProfileScreen(
+                            container = container,
+                            onAvatarClick = ::openDrawer
+                        )
+                    }
+                }
+        }
+    }
+}
 }
 
 @Composable
 private fun LivingBridgeBottomBar(
-    currentTab: MainTab,
+    currentTab: MainTab?,
     maxWidth: androidx.compose.ui.unit.Dp,
     onTabSelected: (MainTab) -> Unit
 ) {

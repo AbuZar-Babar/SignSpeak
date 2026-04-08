@@ -67,6 +67,8 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -154,7 +156,8 @@ fun LiveCameraScreen(
     onWordCommitted: (word: String, confidence: Float, model: SignModel, createdAt: String) -> Unit =
         { _, _, _, _ -> },
     onReportPrediction: (word: String, confidence: Float, model: SignModel) -> Unit =
-        { _, _, _ -> }
+        { _, _, _ -> },
+    onModelOptionsContentChange: ((@Composable () -> Unit)?) -> Unit = {}
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -709,6 +712,190 @@ fun LiveCameraScreen(
         hasPermission && isModelReady && !isModelLoading &&
             (inferenceMode == InferenceMode.ON_DEVICE || (isBackendReachable && !isBackendChecking))
     }
+    val currentDrawerModelOptionsContent by rememberUpdatedState<@Composable () -> Unit>({
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            SettingsSectionLabel("Smart Sentences")
+            SettingsToggleRow(
+                label = "AI Sentence Formation",
+                description = "Use Gemini AI to form natural sentences from detected words",
+                checked = sentenceModeEnabled,
+                onCheckedChange = { enabled ->
+                    sentenceModeEnabled = enabled
+                    coroutineScope.launch {
+                        backendSettingsRepository.saveSentenceModeEnabled(enabled)
+                    }
+                    if (!enabled) {
+                        formedSentence = ""
+                        isSentenceLoading = false
+                        sentenceDebounceJob?.cancel()
+                    }
+                }
+            )
+            AnimatedVisibility(
+                visible = sentenceModeEnabled,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Output Language",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFF6B7280)
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        SentenceLanguage.entries.forEach { lang ->
+                            CameraOptionChip(
+                                label = lang.displayName,
+                                selected = sentenceLanguage == lang,
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    sentenceLanguage = lang
+                                    coroutineScope.launch {
+                                        backendSettingsRepository.saveSentenceLanguage(lang)
+                                    }
+                                    if (formedSentence.isNotBlank() && geminiSentenceFormer != null) {
+                                        val currentWords = transcript
+                                            .split(" ")
+                                            .filter { it.isNotBlank() }
+                                        if (currentWords.size >= sentenceWordThreshold) {
+                                            sentenceDebounceJob?.cancel()
+                                            sentenceDebounceJob = coroutineScope.launch {
+                                                isSentenceLoading = true
+                                                sentenceError = false
+                                                val result = geminiSentenceFormer.formSentence(
+                                                    words = currentWords,
+                                                    language = lang
+                                                )
+                                                formedSentence = result.formedSentence
+                                                sentenceError = result.isError
+                                                isSentenceLoading = false
+                                            }
+                                        }
+                                    }
+                                }
+                            )
+                        }
+                    }
+                    if (geminiSentenceFormer == null) {
+                        Text(
+                            text = "Gemini AI unavailable on this build. Check API key and dependency setup.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFFB91C1C)
+                        )
+                    }
+                }
+            }
+
+            SettingsSectionLabel("Model Quality")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                CameraOptionChip(
+                    label = "Augmented",
+                    selected = selectedModel == SignModel.AUGMENTED,
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        if (selectedModel != SignModel.AUGMENTED) {
+                            selectedModel = SignModel.AUGMENTED
+                        }
+                    }
+                )
+                CameraOptionChip(
+                    label = "Baseline",
+                    selected = selectedModel == SignModel.BASELINE,
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        if (selectedModel != SignModel.BASELINE) {
+                            selectedModel = SignModel.BASELINE
+                        }
+                    }
+                )
+            }
+
+            if (!productMode) {
+                SettingsSectionLabel("Advanced")
+                SettingsToggleRow(
+                    label = "Speed Mode",
+                    description = "Lower resolution for faster processing",
+                    checked = performanceMode,
+                    onCheckedChange = { performanceMode = it },
+                    enabled = !isModelLoading
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    CameraOptionChip(
+                        label = "On Device",
+                        selected = inferenceMode == InferenceMode.ON_DEVICE,
+                        modifier = Modifier.weight(1f),
+                        onClick = { inferenceMode = InferenceMode.ON_DEVICE }
+                    )
+                    CameraOptionChip(
+                        label = "Backend",
+                        selected = inferenceMode == InferenceMode.BACKEND_LANDMARKS,
+                        modifier = Modifier.weight(1f),
+                        onClick = { inferenceMode = InferenceMode.BACKEND_LANDMARKS }
+                    )
+                }
+                if (inferenceMode == InferenceMode.BACKEND_LANDMARKS) {
+                    OutlinedTextField(
+                        value = backendUrlInput,
+                        onValueChange = {
+                            backendUrlInput = it
+                            backendUrlError = null
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        enabled = !isRecording,
+                        label = { Text("Backend URL") },
+                        placeholder = { Text("http://192.168.x.x:8000") },
+                        isError = backendUrlError != null
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = { coroutineScope.launch { applyBackendUrl() } },
+                            enabled = !isRecording && !isBackendChecking,
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Save") }
+                        Button(
+                            onClick = { coroutineScope.launch { refreshBackendHealth(true) } },
+                            enabled = activeBackendUrl.isNotBlank() && !isBackendChecking,
+                            modifier = Modifier.weight(1f)
+                        ) { Text(if (isBackendChecking) "Checking..." else "Health") }
+                    }
+                    backendConnectionMessage?.let { msg ->
+                        Text(
+                            text = msg,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (isBackendReachable) Color(0xFF16A34A) else Color(0xFFB91C1C)
+                        )
+                    }
+                }
+            }
+        }
+    })
+    val drawerModelOptionsContentHost: @Composable () -> Unit = remember {
+        { currentDrawerModelOptionsContent.invoke() }
+    }
+
+    SideEffect {
+        onModelOptionsContentChange(drawerModelOptionsContentHost)
+    }
+    DisposableEffect(onModelOptionsContentChange) {
+        onDispose {
+            onModelOptionsContentChange(null)
+        }
+    }
 
     // ── Root layout (white background, full screen) ───────────────────────────
     Column(
@@ -1040,7 +1227,8 @@ fun LiveCameraScreen(
         }
 
         // ── Expandable Settings panel ─────────────────────────────────────────
-        Card(
+        if (false) {
+            Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
@@ -1308,6 +1496,7 @@ fun LiveCameraScreen(
             }
         }
     }
+}
 }
 
 // ── Helper composables ─────────────────────────────────────────────────────────

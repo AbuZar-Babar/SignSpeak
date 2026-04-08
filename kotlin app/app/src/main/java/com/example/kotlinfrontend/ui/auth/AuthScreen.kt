@@ -17,11 +17,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.AccessibilityNew
 import androidx.compose.material.icons.rounded.Email
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Person
-import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.SignLanguage
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -50,8 +48,6 @@ import com.example.kotlinfrontend.ui.components.AppBackground
 import com.example.kotlinfrontend.ui.components.BannerTone
 import com.example.kotlinfrontend.ui.components.EditorialTextField
 import com.example.kotlinfrontend.ui.components.InlineBanner
-import com.example.kotlinfrontend.ui.components.TonalActionCard
-import com.example.kotlinfrontend.ui.theme.BrandAccent
 import com.example.kotlinfrontend.ui.theme.BrandBackground
 import com.example.kotlinfrontend.ui.theme.BrandInk
 import com.example.kotlinfrontend.ui.theme.BrandMuted
@@ -243,19 +239,6 @@ fun AuthScreen(container: AppContainer) {
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
-
-                TonalActionCard(
-                    title = "Secure & Private",
-                    subtitle = "Your translations and data are protected with industry-standard encryption.",
-                    icon = Icons.Rounded.Security,
-                    accent = BrandPrimary
-                )
-                TonalActionCard(
-                    title = "Inclusive Access",
-                    subtitle = "Designed with accessibility experts for the best PSL experience.",
-                    icon = Icons.Rounded.AccessibilityNew,
-                    accent = BrandAccent
-                )
             }
         }
     }

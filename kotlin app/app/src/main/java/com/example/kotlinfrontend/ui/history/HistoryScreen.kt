@@ -42,7 +42,10 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 
 @Composable
-fun HistoryScreen(container: AppContainer) {
+fun HistoryScreen(
+    container: AppContainer,
+    onAvatarClick: () -> Unit = {}
+) {
     val viewModel: HistoryViewModel = viewModel(
         factory = appViewModelFactory {
             HistoryViewModel(
@@ -76,6 +79,7 @@ fun HistoryScreen(container: AppContainer) {
         item {
             ScreenTopBar(
                 avatarSeed = avatarSeed,
+                onAvatarClick = onAvatarClick,
                 trailingContent = {
                     IconButton(onClick = viewModel::refresh) {
                         Icon(

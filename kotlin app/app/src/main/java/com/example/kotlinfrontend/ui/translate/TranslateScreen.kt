@@ -4,21 +4,16 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Flag
-import androidx.compose.material.icons.rounded.History
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -29,6 +24,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -55,7 +51,11 @@ import com.example.kotlinfrontend.ui.theme.BrandPrimary
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TranslateScreen(container: AppContainer) {
+fun TranslateScreen(
+    container: AppContainer,
+    onAvatarClick: () -> Unit = {},
+    onModelOptionsContentChange: ((@Composable () -> Unit)?) -> Unit = {}
+) {
     val viewModel: TranslateViewModel = viewModel(
         factory = appViewModelFactory {
             TranslateViewModel(
@@ -75,7 +75,10 @@ fun TranslateScreen(container: AppContainer) {
             .padding(start = 24.dp, end = 32.dp, top = 18.dp, bottom = 12.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        ScreenTopBar(avatarSeed = avatarSeed)
+        ScreenTopBar(
+            avatarSeed = avatarSeed,
+            onAvatarClick = onAvatarClick
+        )
 
         uiState.message?.let { message ->
             InlineBanner(
@@ -95,7 +98,8 @@ fun TranslateScreen(container: AppContainer) {
                     isAuthenticated = uiState.sessionState.isAuthenticated,
                     onRequireAuth = { showCamera = false },
                     onWordCommitted = viewModel::onWordCommitted,
-                    onReportPrediction = viewModel::openPredictionReport
+                    onReportPrediction = viewModel::openPredictionReport,
+                    onModelOptionsContentChange = onModelOptionsContentChange
                 )
             }
         } else {
@@ -130,43 +134,11 @@ fun TranslateScreen(container: AppContainer) {
                 }
             }
         }
+    }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Recent Words",
-                style = MaterialTheme.typography.titleMedium,
-                color = BrandInk,
-                fontWeight = FontWeight.SemiBold
-            )
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.History,
-                    contentDescription = null,
-                    tint = BrandPrimary,
-                    modifier = Modifier.size(16.dp)
-                )
-                Text(
-                    text = "View History",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = BrandPrimary
-                )
-            }
-        }
-
-        LazyRow(
-            contentPadding = PaddingValues(end = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            items(uiState.recentHistory.take(8), key = { it.id }) { item ->
-                RecentWordPill(item = item)
-            }
+    LaunchedEffect(showCamera) {
+        if (!showCamera) {
+            onModelOptionsContentChange(null)
         }
     }
 
@@ -271,40 +243,6 @@ fun TranslateScreen(container: AppContainer) {
                     style = MaterialTheme.typography.bodySmall,
                     color = BrandMuted,
                     modifier = Modifier.padding(bottom = 10.dp)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun RecentWordPill(item: com.example.kotlinfrontend.data.model.TranslationHistoryItem) {
-    Surface(
-        shape = RoundedCornerShape(22.dp),
-        color = BrandBackground
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.CheckCircle,
-                contentDescription = null,
-                tint = BrandPrimary,
-                modifier = Modifier.size(18.dp)
-            )
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    text = UiFormatters.prettyWord(item.predictedWordSlug),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = BrandInk,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    text = UiFormatters.confidencePercent(item.confidence),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = BrandMuted
                 )
             }
         }
