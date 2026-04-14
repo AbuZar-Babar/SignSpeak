@@ -58,7 +58,10 @@ import com.example.kotlinfrontend.ui.theme.BrandPrimary
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun DictionaryScreen(container: AppContainer) {
+fun DictionaryScreen(
+    container: AppContainer,
+    onAvatarClick: () -> Unit = {}
+) {
     val context = LocalContext.current
     val viewModel: DictionaryViewModel = viewModel(
         factory = appViewModelFactory {
@@ -89,7 +92,10 @@ fun DictionaryScreen(container: AppContainer) {
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            ScreenTopBar(avatarSeed = avatarSeed)
+            ScreenTopBar(
+                avatarSeed = avatarSeed,
+                onAvatarClick = onAvatarClick
+            )
         }
 
         item {

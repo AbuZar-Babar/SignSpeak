@@ -46,7 +46,10 @@ import com.example.kotlinfrontend.ui.theme.SurfaceContainerLowest
 import com.example.kotlinfrontend.ui.theme.rememberResponsiveLayoutSpec
 
 @Composable
-fun ProfileScreen(container: AppContainer) {
+fun ProfileScreen(
+    container: AppContainer,
+    onAvatarClick: () -> Unit = {}
+) {
     val viewModel: ProfileViewModel = viewModel(
         factory = appViewModelFactory {
             ProfileViewModel(
@@ -73,7 +76,10 @@ fun ProfileScreen(container: AppContainer) {
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
-            ScreenTopBar(avatarSeed = avatarSeed)
+            ScreenTopBar(
+                avatarSeed = avatarSeed,
+                onAvatarClick = onAvatarClick
+            )
         }
 
         item {

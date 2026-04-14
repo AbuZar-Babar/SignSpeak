@@ -8,6 +8,8 @@ val supabaseUrl = providers.gradleProperty("SUPABASE_URL")
     .orElse(System.getenv("SUPABASE_URL") ?: "")
 val supabasePublishableKey = providers.gradleProperty("SUPABASE_PUBLISHABLE_KEY")
     .orElse(System.getenv("SUPABASE_PUBLISHABLE_KEY") ?: "")
+val geminiApiKey = providers.gradleProperty("GEMINI_API_KEY")
+    .orElse(System.getenv("GEMINI_API_KEY") ?: "")
 
 android {
     namespace = "com.example.kotlinfrontend"
@@ -33,6 +35,7 @@ android {
         )
         buildConfigField("String", "SUPABASE_AUTH_SCHEME", "\"signspeak\"")
         buildConfigField("String", "SUPABASE_AUTH_HOST", "\"auth\"")
+        buildConfigField("String", "GEMINI_API_KEY", "\"${geminiApiKey.get()}\"")
     }
 
     buildTypes {
@@ -68,12 +71,14 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.ktor.client.android)
+    implementation(libs.ktor.client.okhttp)
     implementation(platform(libs.supabase.bom))
     implementation(libs.supabase.auth)
     implementation(libs.supabase.postgrest)
     implementation(libs.mediapipe.tasks.vision)
     implementation(libs.okhttp)
     implementation(libs.tensorflow.lite)
+    implementation(libs.google.generativeai)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)

@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import androidx.annotation.RequiresApi
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -89,6 +90,7 @@ class JsonWriter(private val context: Context) {
         return "${safeName}_${timestamp}.json"
     }
 
+    @RequiresApi(Build.VERSION_CODES.Q)
     private fun writeWithMediaStore(fileName: String, payload: String): JsonSaveResult {
         val resolver = context.contentResolver
         val collection = MediaStore.Downloads.EXTERNAL_CONTENT_URI

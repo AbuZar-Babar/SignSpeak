@@ -2,6 +2,7 @@ package com.example.kotlinfrontend.ui.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,14 +22,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -359,6 +358,7 @@ fun ScreenTopBar(
     avatarSeed: String,
     modifier: Modifier = Modifier,
     title: String = "SignSpeak",
+    onAvatarClick: (() -> Unit)? = null,
     trailingContent: (@Composable RowScope.() -> Unit)? = null
 ) {
     Row(
@@ -370,13 +370,14 @@ fun ScreenTopBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            IconButton(onClick = {}) {
-                Icon(
-                    imageVector = Icons.Rounded.Menu,
-                    contentDescription = "Menu",
-                    tint = BrandInk
-                )
-            }
+            ProfileAvatar(
+                seed = avatarSeed,
+                modifier = if (onAvatarClick != null) {
+                    Modifier.clickable(onClick = onAvatarClick)
+                } else {
+                    Modifier
+                }
+            )
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleLarge,
@@ -389,7 +390,6 @@ fun ScreenTopBar(
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             trailingContent?.invoke(this)
-            ProfileAvatar(seed = avatarSeed)
         }
     }
 }

@@ -67,6 +67,8 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -84,6 +86,8 @@ import androidx.core.content.ContextCompat
 import com.example.kotlinfrontend.app.SignSpeakApp
 import com.example.kotlinfrontend.ui.theme.KotlinFrontendTheme
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -98,6 +102,7 @@ import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.roundToInt
 
 import com.example.kotlinfrontend.ui.root.SignSpeakRoot
+import com.example.kotlinfrontend.BuildConfig
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -151,7 +156,8 @@ fun LiveCameraScreen(
     onWordCommitted: (word: String, confidence: Float, model: SignModel, createdAt: String) -> Unit =
         { _, _, _, _ -> },
     onReportPrediction: (word: String, confidence: Float, model: SignModel) -> Unit =
-        { _, _, _ -> }
+        { _, _, _ -> },
+    onModelOptionsContentChange: ((@Composable () -> Unit)?) -> Unit = {}
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -224,6 +230,23 @@ fun LiveCameraScreen(
     var isBackendChecking by remember { mutableStateOf(false) }
     var didLoadSavedBackendUrl by remember { mutableStateOf(false) }
     var lastObservedCommitCount by remember { mutableIntStateOf(0) }
+
+    // ── Smart Sentences (Gemini LLM) ──────────────────────────────────────────
+    var sentenceModeEnabled by remember { mutableStateOf(true) }
+    var sentenceLanguage by remember { mutableStateOf(SentenceLanguage.BOTH) }
+    var formedSentence by remember { mutableStateOf("") }
+    var isSentenceLoading by remember { mutableStateOf(false) }
+    var sentenceError by remember { mutableStateOf(false) }
+    val sentenceWordThreshold = 3
+    var sentenceDebounceJob by remember { mutableStateOf<Job?>(null) }
+    val geminiSentenceFormer = remember {
+        val apiKey = BuildConfig.GEMINI_API_KEY.trim()
+        if (apiKey.isBlank()) {
+            null
+        } else {
+            runCatching { GeminiSentenceFormer(apiKey) }.getOrNull()
+        }
+    }
 
     // Sync torch whenever torchEnabled changes
     LaunchedEffect(torchEnabled) {
@@ -486,6 +509,29 @@ fun LiveCameraScreen(
                                             Instant.now().toString()
                                         )
                                     }
+
+                                    // ── Trigger Gemini sentence formation ────
+                                    if (sentenceModeEnabled &&
+                                        geminiSentenceFormer != null &&
+                                        liveState.commitCount >= sentenceWordThreshold
+                                    ) {
+                                        val currentWords = liveState.transcript
+                                            .split(" ")
+                                            .filter { it.isNotBlank() }
+                                        sentenceDebounceJob?.cancel()
+                                        sentenceDebounceJob = coroutineScope.launch {
+                                            delay(800L)
+                                            isSentenceLoading = true
+                                            sentenceError = false
+                                            val result = geminiSentenceFormer.formSentence(
+                                                words = currentWords,
+                                                language = sentenceLanguage
+                                            )
+                                            formedSentence = result.formedSentence
+                                            sentenceError = result.isError
+                                            isSentenceLoading = false
+                                        }
+                                    }
                                 }
 
                                 liveState.rawPrediction?.let { prediction ->
@@ -622,6 +668,9 @@ fun LiveCameraScreen(
         if (savedBackendUrl.isNotBlank()) {
             refreshBackendHealth(updateStatusText = false)
         }
+        // Load saved sentence mode preferences
+        sentenceModeEnabled = backendSettingsRepository.sentenceModeEnabledFlow.first()
+        sentenceLanguage = backendSettingsRepository.sentenceLanguageFlow.first()
     }
 
     LaunchedEffect(hasPermission, inferenceMode, selectedModel, performanceMode, useQuantizedModel, activeBackendUrl, useFrontCamera) {
@@ -662,6 +711,190 @@ fun LiveCameraScreen(
     val canStartRecording = if (isRecording) true else {
         hasPermission && isModelReady && !isModelLoading &&
             (inferenceMode == InferenceMode.ON_DEVICE || (isBackendReachable && !isBackendChecking))
+    }
+    val currentDrawerModelOptionsContent by rememberUpdatedState<@Composable () -> Unit>({
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            SettingsSectionLabel("Smart Sentences")
+            SettingsToggleRow(
+                label = "AI Sentence Formation",
+                description = "Use Gemini AI to form natural sentences from detected words",
+                checked = sentenceModeEnabled,
+                onCheckedChange = { enabled ->
+                    sentenceModeEnabled = enabled
+                    coroutineScope.launch {
+                        backendSettingsRepository.saveSentenceModeEnabled(enabled)
+                    }
+                    if (!enabled) {
+                        formedSentence = ""
+                        isSentenceLoading = false
+                        sentenceDebounceJob?.cancel()
+                    }
+                }
+            )
+            AnimatedVisibility(
+                visible = sentenceModeEnabled,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Output Language",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFF6B7280)
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        SentenceLanguage.entries.forEach { lang ->
+                            CameraOptionChip(
+                                label = lang.displayName,
+                                selected = sentenceLanguage == lang,
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    sentenceLanguage = lang
+                                    coroutineScope.launch {
+                                        backendSettingsRepository.saveSentenceLanguage(lang)
+                                    }
+                                    if (formedSentence.isNotBlank() && geminiSentenceFormer != null) {
+                                        val currentWords = transcript
+                                            .split(" ")
+                                            .filter { it.isNotBlank() }
+                                        if (currentWords.size >= sentenceWordThreshold) {
+                                            sentenceDebounceJob?.cancel()
+                                            sentenceDebounceJob = coroutineScope.launch {
+                                                isSentenceLoading = true
+                                                sentenceError = false
+                                                val result = geminiSentenceFormer.formSentence(
+                                                    words = currentWords,
+                                                    language = lang
+                                                )
+                                                formedSentence = result.formedSentence
+                                                sentenceError = result.isError
+                                                isSentenceLoading = false
+                                            }
+                                        }
+                                    }
+                                }
+                            )
+                        }
+                    }
+                    if (geminiSentenceFormer == null) {
+                        Text(
+                            text = "Gemini AI unavailable on this build. Check API key and dependency setup.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFFB91C1C)
+                        )
+                    }
+                }
+            }
+
+            SettingsSectionLabel("Model Quality")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                CameraOptionChip(
+                    label = "Augmented",
+                    selected = selectedModel == SignModel.AUGMENTED,
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        if (selectedModel != SignModel.AUGMENTED) {
+                            selectedModel = SignModel.AUGMENTED
+                        }
+                    }
+                )
+                CameraOptionChip(
+                    label = "Baseline",
+                    selected = selectedModel == SignModel.BASELINE,
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        if (selectedModel != SignModel.BASELINE) {
+                            selectedModel = SignModel.BASELINE
+                        }
+                    }
+                )
+            }
+
+            if (!productMode) {
+                SettingsSectionLabel("Advanced")
+                SettingsToggleRow(
+                    label = "Speed Mode",
+                    description = "Lower resolution for faster processing",
+                    checked = performanceMode,
+                    onCheckedChange = { performanceMode = it },
+                    enabled = !isModelLoading
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    CameraOptionChip(
+                        label = "On Device",
+                        selected = inferenceMode == InferenceMode.ON_DEVICE,
+                        modifier = Modifier.weight(1f),
+                        onClick = { inferenceMode = InferenceMode.ON_DEVICE }
+                    )
+                    CameraOptionChip(
+                        label = "Backend",
+                        selected = inferenceMode == InferenceMode.BACKEND_LANDMARKS,
+                        modifier = Modifier.weight(1f),
+                        onClick = { inferenceMode = InferenceMode.BACKEND_LANDMARKS }
+                    )
+                }
+                if (inferenceMode == InferenceMode.BACKEND_LANDMARKS) {
+                    OutlinedTextField(
+                        value = backendUrlInput,
+                        onValueChange = {
+                            backendUrlInput = it
+                            backendUrlError = null
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        enabled = !isRecording,
+                        label = { Text("Backend URL") },
+                        placeholder = { Text("http://192.168.x.x:8000") },
+                        isError = backendUrlError != null
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = { coroutineScope.launch { applyBackendUrl() } },
+                            enabled = !isRecording && !isBackendChecking,
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Save") }
+                        Button(
+                            onClick = { coroutineScope.launch { refreshBackendHealth(true) } },
+                            enabled = activeBackendUrl.isNotBlank() && !isBackendChecking,
+                            modifier = Modifier.weight(1f)
+                        ) { Text(if (isBackendChecking) "Checking..." else "Health") }
+                    }
+                    backendConnectionMessage?.let { msg ->
+                        Text(
+                            text = msg,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (isBackendReachable) Color(0xFF16A34A) else Color(0xFFB91C1C)
+                        )
+                    }
+                }
+            }
+        }
+    })
+    val drawerModelOptionsContentHost: @Composable () -> Unit = remember {
+        { currentDrawerModelOptionsContent.invoke() }
+    }
+
+    SideEffect {
+        onModelOptionsContentChange(drawerModelOptionsContentHost)
+    }
+    DisposableEffect(onModelOptionsContentChange) {
+        onDispose {
+            onModelOptionsContentChange(null)
+        }
     }
 
     // ── Root layout (white background, full screen) ───────────────────────────
@@ -857,6 +1090,10 @@ fun LiveCameraScreen(
                                         onClick = {
                                             liveEngineRef.get()?.clearTranscript()
                                             transcript = ""
+                                            formedSentence = ""
+                                            sentenceError = false
+                                            isSentenceLoading = false
+                                            sentenceDebounceJob?.cancel()
                                             lastObservedCommitCount = 0
                                         },
                                         contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)
@@ -870,6 +1107,71 @@ fun LiveCameraScreen(
                                         },
                                         contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)
                                     ) { Text("Report", color = Color(0xFF94A3B8)) }
+                                }
+                            }
+                        }
+
+                        // ── Formed sentence card (Gemini) ──────────────────
+                        if (sentenceModeEnabled && (formedSentence.isNotBlank() || isSentenceLoading)) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 4.dp)
+                                    .background(
+                                        color = Color(0x33FFFFFF),
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+                                    .padding(horizontal = 10.dp, vertical = 8.dp)
+                            ) {
+                                if (isSentenceLoading) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        LinearProgressIndicator(
+                                            modifier = Modifier
+                                                .width(48.dp)
+                                                .height(3.dp)
+                                                .clip(RoundedCornerShape(10.dp)),
+                                            color = Color(0xFFFCD400),
+                                            trackColor = Color(0x33FFFFFF)
+                                        )
+                                        Text(
+                                            text = "Forming sentence…",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = Color(0xFFCCE5FF)
+                                        )
+                                    }
+                                } else {
+                                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "✨ AI Sentence",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFFFCD400)
+                                            )
+                                            if (sentenceError) {
+                                                Text(
+                                                    text = "(fallback)",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = Color(0xFF94A3B8)
+                                                )
+                                            }
+                                        }
+                                        Text(
+                                            text = formedSentence,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Medium,
+                                            color = Color.White,
+                                            maxLines = 3,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -925,7 +1227,8 @@ fun LiveCameraScreen(
         }
 
         // ── Expandable Settings panel ─────────────────────────────────────────
-        Card(
+        if (false) {
+            Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
@@ -1010,6 +1313,85 @@ fun LiveCameraScreen(
                                 onCheckedChange = { torchEnabled = it }
                             )
                         }
+                        }
+
+                        // ── Smart Sentences section ─────────────────────────
+                        SettingsSectionLabel("Smart Sentences")
+                        SettingsToggleRow(
+                            label = "AI Sentence Formation",
+                            description = "Use Gemini AI to form natural sentences from detected words",
+                            checked = sentenceModeEnabled,
+                            onCheckedChange = { enabled ->
+                                sentenceModeEnabled = enabled
+                                coroutineScope.launch {
+                                    backendSettingsRepository.saveSentenceModeEnabled(enabled)
+                                }
+                                if (!enabled) {
+                                    formedSentence = ""
+                                    isSentenceLoading = false
+                                    sentenceDebounceJob?.cancel()
+                                }
+                            }
+                        )
+                        AnimatedVisibility(
+                            visible = sentenceModeEnabled,
+                            enter = expandVertically() + fadeIn(),
+                            exit = shrinkVertically() + fadeOut()
+                        ) {
+                            Column(
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = "Output Language",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color(0xFF6B7280)
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    SentenceLanguage.entries.forEach { lang ->
+                                        CameraOptionChip(
+                                            label = lang.displayName,
+                                            selected = sentenceLanguage == lang,
+                                            modifier = Modifier.weight(1f),
+                                            onClick = {
+                                                sentenceLanguage = lang
+                                                coroutineScope.launch {
+                                                    backendSettingsRepository.saveSentenceLanguage(lang)
+                                                }
+                                                // Re-trigger sentence with new language if we have words
+                                                if (formedSentence.isNotBlank() && geminiSentenceFormer != null) {
+                                                    val currentWords = transcript
+                                                        .split(" ")
+                                                        .filter { it.isNotBlank() }
+                                                    if (currentWords.size >= sentenceWordThreshold) {
+                                                        sentenceDebounceJob?.cancel()
+                                                        sentenceDebounceJob = coroutineScope.launch {
+                                                            isSentenceLoading = true
+                                                            sentenceError = false
+                                                            val result = geminiSentenceFormer.formSentence(
+                                                                words = currentWords,
+                                                                language = lang
+                                                            )
+                                                            formedSentence = result.formedSentence
+                                                            sentenceError = result.isError
+                                                            isSentenceLoading = false
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        )
+                                    }
+                                }
+                                if (geminiSentenceFormer == null) {
+                                    Text(
+                                        text = "Gemini AI unavailable on this build. Check API key and dependency setup.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color(0xFFB91C1C)
+                                    )
+                                }
+                            }
                         }
 
                         // ── Model quality section ──────────────────────────
@@ -1114,6 +1496,7 @@ fun LiveCameraScreen(
             }
         }
     }
+}
 }
 
 // ── Helper composables ─────────────────────────────────────────────────────────
