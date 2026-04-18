@@ -53,6 +53,7 @@ import com.example.kotlinfrontend.ui.theme.BrandPrimary
 @Composable
 fun TranslateScreen(
     container: AppContainer,
+    onMenuClick: () -> Unit = {},
     onAvatarClick: () -> Unit = {},
     onModelOptionsContentChange: ((@Composable () -> Unit)?) -> Unit = {}
 ) {
@@ -72,11 +73,12 @@ fun TranslateScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(start = 24.dp, end = 32.dp, top = 18.dp, bottom = 12.dp),
+            .padding(start = 24.dp, end = 32.dp, top = 8.dp, bottom = 12.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         ScreenTopBar(
             avatarSeed = avatarSeed,
+            onMenuClick = onMenuClick,
             onAvatarClick = onAvatarClick
         )
 

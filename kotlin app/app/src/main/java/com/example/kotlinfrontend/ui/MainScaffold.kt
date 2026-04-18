@@ -14,19 +14,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoStories
-import androidx.compose.material.icons.rounded.Logout
 import androidx.compose.material.icons.rounded.History
-import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.SignLanguage
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -119,50 +117,18 @@ fun MainScaffold(container: AppContainer) {
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Text(
-                            text = "Menu",
+                            text = "Settings",
                             style = MaterialTheme.typography.titleLarge,
                             color = BrandPrimaryDark,
                             fontWeight = FontWeight.Bold
                         )
 
-                        NavigationDrawerItem(
-                            label = { Text("Profile") },
-                            selected = currentRoute == ProfileRoute,
-                            onClick = {
-                                navigateTo(ProfileRoute)
-                                closeDrawer()
-                            },
-                            icon = {
-                                Icon(
-                                    imageVector = Icons.Rounded.Person,
-                                    contentDescription = null
-                                )
-                            }
-                        )
-
-                        NavigationDrawerItem(
-                            label = { Text("Sign out") },
-                            selected = false,
-                            onClick = {
-                                scope.launch {
-                                    container.authRepository.signOut()
-                                }
-                                closeDrawer()
-                            },
-                            icon = {
-                                Icon(
-                                    imageVector = Icons.Rounded.Logout,
-                                    contentDescription = null
-                                )
-                            }
-                        )
-
                         Text(
-                            text = "Model Options",
+                            text = "Model & Translation",
                             style = MaterialTheme.typography.titleMedium,
                             color = BrandInk,
                             fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)
+                            modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
                         )
 
                         if (drawerModelOptionsContent != null) {
@@ -197,12 +163,14 @@ fun MainScaffold(container: AppContainer) {
                     startDestination = MainTab.Translate.route,
                     modifier = Modifier
                         .fillMaxSize()
+                        .statusBarsPadding()
                         .padding(innerPadding)
                 ) {
                     composable(MainTab.Translate.route) {
                         TranslateScreen(
                             container = container,
-                            onAvatarClick = ::openDrawer,
+                            onMenuClick = ::openDrawer,
+                            onAvatarClick = { navigateTo(ProfileRoute) },
                             onModelOptionsContentChange = { content ->
                                 drawerModelOptionsContent = content
                             }
@@ -211,25 +179,28 @@ fun MainScaffold(container: AppContainer) {
                     composable(MainTab.Dictionary.route) {
                         DictionaryScreen(
                             container = container,
-                            onAvatarClick = ::openDrawer
+                            onMenuClick = ::openDrawer,
+                            onAvatarClick = { navigateTo(ProfileRoute) }
                         )
                     }
                     composable(MainTab.History.route) {
                         HistoryScreen(
                             container = container,
-                            onAvatarClick = ::openDrawer
+                            onMenuClick = ::openDrawer,
+                            onAvatarClick = { navigateTo(ProfileRoute) }
                         )
                     }
                     composable(ProfileRoute) {
                         ProfileScreen(
                             container = container,
-                            onAvatarClick = ::openDrawer
+                            onMenuClick = ::openDrawer,
+                            onAvatarClick = { navigateTo(ProfileRoute) }
                         )
                     }
                 }
+            }
         }
     }
-}
 }
 
 @Composable

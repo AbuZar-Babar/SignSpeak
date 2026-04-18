@@ -48,6 +48,7 @@ import com.example.kotlinfrontend.ui.theme.rememberResponsiveLayoutSpec
 @Composable
 fun ProfileScreen(
     container: AppContainer,
+    onMenuClick: () -> Unit = {},
     onAvatarClick: () -> Unit = {}
 ) {
     val viewModel: ProfileViewModel = viewModel(
@@ -70,7 +71,7 @@ fun ProfileScreen(
         contentPadding = PaddingValues(
             start = 24.dp,
             end = 32.dp,
-            top = 18.dp,
+            top = 8.dp,
             bottom = 112.dp
         ),
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -78,6 +79,7 @@ fun ProfileScreen(
         item {
             ScreenTopBar(
                 avatarSeed = avatarSeed,
+                onMenuClick = onMenuClick,
                 onAvatarClick = onAvatarClick
             )
         }
