@@ -60,6 +60,7 @@ import com.example.kotlinfrontend.ui.theme.BrandPrimary
 @Composable
 fun DictionaryScreen(
     container: AppContainer,
+    onMenuClick: () -> Unit = {},
     onAvatarClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -86,7 +87,7 @@ fun DictionaryScreen(
         contentPadding = PaddingValues(
             start = 24.dp,
             end = 32.dp,
-            top = 18.dp,
+            top = 8.dp,
             bottom = 112.dp
         ),
         verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -94,6 +95,7 @@ fun DictionaryScreen(
         item {
             ScreenTopBar(
                 avatarSeed = avatarSeed,
+                onMenuClick = onMenuClick,
                 onAvatarClick = onAvatarClick
             )
         }

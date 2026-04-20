@@ -19,15 +19,18 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -358,6 +361,7 @@ fun ScreenTopBar(
     avatarSeed: String,
     modifier: Modifier = Modifier,
     title: String = "SignSpeak",
+    onMenuClick: (() -> Unit)? = null,
     onAvatarClick: (() -> Unit)? = null,
     trailingContent: (@Composable RowScope.() -> Unit)? = null
 ) {
@@ -366,18 +370,26 @@ fun ScreenTopBar(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        Box(
+            modifier = Modifier.weight(1f),
+            contentAlignment = Alignment.CenterStart
         ) {
-            ProfileAvatar(
-                seed = avatarSeed,
-                modifier = if (onAvatarClick != null) {
-                    Modifier.clickable(onClick = onAvatarClick)
-                } else {
-                    Modifier
+            if (onMenuClick != null) {
+                IconButton(onClick = onMenuClick) {
+                    Icon(
+                        imageVector = Icons.Rounded.Menu,
+                        contentDescription = "Open menu",
+                        tint = BrandPrimaryDark
+                    )
                 }
-            )
+            } else {
+                Box(modifier = Modifier.width(48.dp))
+            }
+        }
+        Box(
+            modifier = Modifier.weight(1f),
+            contentAlignment = Alignment.Center
+        ) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleLarge,
@@ -386,10 +398,19 @@ fun ScreenTopBar(
             )
         }
         Row(
+            modifier = Modifier.weight(1f),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.End
         ) {
             trailingContent?.invoke(this)
+            ProfileAvatar(
+                seed = avatarSeed,
+                modifier = if (onAvatarClick != null) {
+                    Modifier.clickable(onClick = onAvatarClick)
+                } else {
+                    Modifier
+                }
+            )
         }
     }
 }
