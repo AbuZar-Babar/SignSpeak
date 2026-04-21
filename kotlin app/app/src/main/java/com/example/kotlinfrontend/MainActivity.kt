@@ -102,7 +102,6 @@ import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.roundToInt
 
 import com.example.kotlinfrontend.ui.root.SignSpeakRoot
-import com.example.kotlinfrontend.BuildConfig
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -191,7 +190,7 @@ fun LiveCameraScreen(
         )
     }
     var inferenceMode by remember { mutableStateOf(InferenceMode.ON_DEVICE) }
-    var selectedModel by remember { mutableStateOf(SignModel.AUGMENTED) }
+    var selectedModel by remember { mutableStateOf(SignModel.BASELINE) }
     var useQuantizedModel by remember { mutableStateOf(false) }
     var performanceMode by remember { mutableStateOf(true) }
     var showHandOverlay by remember { mutableStateOf(false) }
@@ -232,21 +231,14 @@ fun LiveCameraScreen(
     var lastObservedCommitCount by remember { mutableIntStateOf(0) }
 
     // ── Smart Sentences (Gemini LLM) ──────────────────────────────────────────
-    var sentenceModeEnabled by remember { mutableStateOf(true) }
+    var sentenceModeEnabled by remember { mutableStateOf(false) }
     var sentenceLanguage by remember { mutableStateOf(SentenceLanguage.BOTH) }
     var formedSentence by remember { mutableStateOf("") }
     var isSentenceLoading by remember { mutableStateOf(false) }
     var sentenceError by remember { mutableStateOf(false) }
     val sentenceWordThreshold = 3
     var sentenceDebounceJob by remember { mutableStateOf<Job?>(null) }
-    val geminiSentenceFormer = remember {
-        val apiKey = BuildConfig.GEMINI_API_KEY.trim()
-        if (apiKey.isBlank()) {
-            null
-        } else {
-            runCatching { GeminiSentenceFormer(apiKey) }.getOrNull()
-        }
-    }
+    val geminiSentenceFormer: GeminiSentenceFormer? = null
 
     // Sync torch whenever torchEnabled changes
     LaunchedEffect(torchEnabled) {
@@ -260,6 +252,8 @@ fun LiveCameraScreen(
     LaunchedEffect(productMode) {
         if (productMode) {
             inferenceMode = InferenceMode.ON_DEVICE
+            selectedModel = SignModel.BASELINE
+            sentenceModeEnabled = false
         }
     }
 
@@ -668,9 +662,9 @@ fun LiveCameraScreen(
         if (savedBackendUrl.isNotBlank()) {
             refreshBackendHealth(updateStatusText = false)
         }
-        // Load saved sentence mode preferences
-        sentenceModeEnabled = backendSettingsRepository.sentenceModeEnabledFlow.first()
-        sentenceLanguage = backendSettingsRepository.sentenceLanguageFlow.first()
+        sentenceModeEnabled = false
+        sentenceLanguage = SentenceLanguage.BOTH
+        backendSettingsRepository.saveSentenceModeEnabled(false)
     }
 
     LaunchedEffect(hasPermission, inferenceMode, selectedModel, performanceMode, useQuantizedModel, activeBackendUrl, useFrontCamera) {
@@ -712,184 +706,82 @@ fun LiveCameraScreen(
         hasPermission && isModelReady && !isModelLoading &&
             (inferenceMode == InferenceMode.ON_DEVICE || (isBackendReachable && !isBackendChecking))
     }
-    val currentDrawerModelOptionsContent by rememberUpdatedState<@Composable () -> Unit>({
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 4.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            SettingsSectionLabel("Smart Sentences")
-            SettingsToggleRow(
-                label = "AI Sentence Formation",
-                description = "Use Gemini AI to form natural sentences from detected words",
-                checked = sentenceModeEnabled,
-                onCheckedChange = { enabled ->
-                    sentenceModeEnabled = enabled
-                    coroutineScope.launch {
-                        backendSettingsRepository.saveSentenceModeEnabled(enabled)
-                    }
-                    if (!enabled) {
-                        formedSentence = ""
-                        isSentenceLoading = false
-                        sentenceDebounceJob?.cancel()
-                    }
-                }
-            )
-            AnimatedVisibility(
-                visible = sentenceModeEnabled,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = "Output Language",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFF6B7280)
+    val currentDrawerModelOptionsContent by rememberUpdatedState<(@Composable () -> Unit)?>(
+        if (!productMode) {
+            {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    SettingsSectionLabel("Advanced")
+                    SettingsToggleRow(
+                        label = "Speed Mode",
+                        description = "Lower resolution for faster processing",
+                        checked = performanceMode,
+                        onCheckedChange = { performanceMode = it },
+                        enabled = !isModelLoading
                     )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        SentenceLanguage.entries.forEach { lang ->
-                            CameraOptionChip(
-                                label = lang.displayName,
-                                selected = sentenceLanguage == lang,
-                                modifier = Modifier.weight(1f),
-                                onClick = {
-                                    sentenceLanguage = lang
-                                    coroutineScope.launch {
-                                        backendSettingsRepository.saveSentenceLanguage(lang)
-                                    }
-                                    if (formedSentence.isNotBlank() && geminiSentenceFormer != null) {
-                                        val currentWords = transcript
-                                            .split(" ")
-                                            .filter { it.isNotBlank() }
-                                        if (currentWords.size >= sentenceWordThreshold) {
-                                            sentenceDebounceJob?.cancel()
-                                            sentenceDebounceJob = coroutineScope.launch {
-                                                isSentenceLoading = true
-                                                sentenceError = false
-                                                val result = geminiSentenceFormer.formSentence(
-                                                    words = currentWords,
-                                                    language = lang
-                                                )
-                                                formedSentence = result.formedSentence
-                                                sentenceError = result.isError
-                                                isSentenceLoading = false
-                                            }
-                                        }
-                                    }
-                                }
+                        CameraOptionChip(
+                            label = "On Device",
+                            selected = inferenceMode == InferenceMode.ON_DEVICE,
+                            modifier = Modifier.weight(1f),
+                            onClick = { inferenceMode = InferenceMode.ON_DEVICE }
+                        )
+                        CameraOptionChip(
+                            label = "Backend",
+                            selected = inferenceMode == InferenceMode.BACKEND_LANDMARKS,
+                            modifier = Modifier.weight(1f),
+                            onClick = { inferenceMode = InferenceMode.BACKEND_LANDMARKS }
+                        )
+                    }
+                    if (inferenceMode == InferenceMode.BACKEND_LANDMARKS) {
+                        OutlinedTextField(
+                            value = backendUrlInput,
+                            onValueChange = {
+                                backendUrlInput = it
+                                backendUrlError = null
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            enabled = !isRecording,
+                            label = { Text("Backend URL") },
+                            placeholder = { Text("http://192.168.x.x:8000") },
+                            isError = backendUrlError != null
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = { coroutineScope.launch { applyBackendUrl() } },
+                                enabled = !isRecording && !isBackendChecking,
+                                modifier = Modifier.weight(1f)
+                            ) { Text("Save") }
+                            Button(
+                                onClick = { coroutineScope.launch { refreshBackendHealth(true) } },
+                                enabled = activeBackendUrl.isNotBlank() && !isBackendChecking,
+                                modifier = Modifier.weight(1f)
+                            ) { Text(if (isBackendChecking) "Checking..." else "Health") }
+                        }
+                        backendConnectionMessage?.let { msg ->
+                            Text(
+                                text = msg,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (isBackendReachable) Color(0xFF16A34A) else Color(0xFFB91C1C)
                             )
                         }
                     }
-                    if (geminiSentenceFormer == null) {
-                        Text(
-                            text = "Gemini AI unavailable on this build. Check API key and dependency setup.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFFB91C1C)
-                        )
-                    }
                 }
             }
-
-            SettingsSectionLabel("Model Quality")
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                CameraOptionChip(
-                    label = "Augmented",
-                    selected = selectedModel == SignModel.AUGMENTED,
-                    modifier = Modifier.weight(1f),
-                    onClick = {
-                        if (selectedModel != SignModel.AUGMENTED) {
-                            selectedModel = SignModel.AUGMENTED
-                        }
-                    }
-                )
-                CameraOptionChip(
-                    label = "Baseline",
-                    selected = selectedModel == SignModel.BASELINE,
-                    modifier = Modifier.weight(1f),
-                    onClick = {
-                        if (selectedModel != SignModel.BASELINE) {
-                            selectedModel = SignModel.BASELINE
-                        }
-                    }
-                )
-            }
-
-            if (!productMode) {
-                SettingsSectionLabel("Advanced")
-                SettingsToggleRow(
-                    label = "Speed Mode",
-                    description = "Lower resolution for faster processing",
-                    checked = performanceMode,
-                    onCheckedChange = { performanceMode = it },
-                    enabled = !isModelLoading
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    CameraOptionChip(
-                        label = "On Device",
-                        selected = inferenceMode == InferenceMode.ON_DEVICE,
-                        modifier = Modifier.weight(1f),
-                        onClick = { inferenceMode = InferenceMode.ON_DEVICE }
-                    )
-                    CameraOptionChip(
-                        label = "Backend",
-                        selected = inferenceMode == InferenceMode.BACKEND_LANDMARKS,
-                        modifier = Modifier.weight(1f),
-                        onClick = { inferenceMode = InferenceMode.BACKEND_LANDMARKS }
-                    )
-                }
-                if (inferenceMode == InferenceMode.BACKEND_LANDMARKS) {
-                    OutlinedTextField(
-                        value = backendUrlInput,
-                        onValueChange = {
-                            backendUrlInput = it
-                            backendUrlError = null
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        enabled = !isRecording,
-                        label = { Text("Backend URL") },
-                        placeholder = { Text("http://192.168.x.x:8000") },
-                        isError = backendUrlError != null
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(
-                            onClick = { coroutineScope.launch { applyBackendUrl() } },
-                            enabled = !isRecording && !isBackendChecking,
-                            modifier = Modifier.weight(1f)
-                        ) { Text("Save") }
-                        Button(
-                            onClick = { coroutineScope.launch { refreshBackendHealth(true) } },
-                            enabled = activeBackendUrl.isNotBlank() && !isBackendChecking,
-                            modifier = Modifier.weight(1f)
-                        ) { Text(if (isBackendChecking) "Checking..." else "Health") }
-                    }
-                    backendConnectionMessage?.let { msg ->
-                        Text(
-                            text = msg,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (isBackendReachable) Color(0xFF16A34A) else Color(0xFFB91C1C)
-                        )
-                    }
-                }
-            }
+        } else {
+            null
         }
-    })
-    val drawerModelOptionsContentHost: @Composable () -> Unit = remember {
-        { currentDrawerModelOptionsContent.invoke() }
-    }
-
+    )
     SideEffect {
-        onModelOptionsContentChange(drawerModelOptionsContentHost)
+        onModelOptionsContentChange(currentDrawerModelOptionsContent)
     }
     DisposableEffect(onModelOptionsContentChange) {
         onDispose {

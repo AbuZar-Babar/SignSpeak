@@ -123,19 +123,18 @@ fun MainScaffold(container: AppContainer) {
                             fontWeight = FontWeight.Bold
                         )
 
-                        Text(
-                            text = "Model & Translation",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = BrandInk,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
-                        )
-
                         if (drawerModelOptionsContent != null) {
+                            Text(
+                                text = "Configuration",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = BrandInk,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                            )
                             drawerModelOptionsContent?.invoke()
                         } else {
                             Text(
-                                text = "Open Translate to adjust model settings.",
+                                text = "No adjustable translation settings are available right now.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = BrandMuted
                             )

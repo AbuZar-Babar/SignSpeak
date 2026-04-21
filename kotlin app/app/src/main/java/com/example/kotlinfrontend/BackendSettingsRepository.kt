@@ -41,7 +41,7 @@ class BackendSettingsRepository(private val context: Context) {
             }
         }
         .map { preferences ->
-            preferences[Keys.sentenceModeEnabled] ?: true
+            preferences[Keys.sentenceModeEnabled] ?: false
         }
 
     val sentenceLanguageFlow: Flow<SentenceLanguage> = context.backendSettingsDataStore.data
