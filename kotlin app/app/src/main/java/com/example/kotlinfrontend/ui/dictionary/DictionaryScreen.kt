@@ -46,7 +46,6 @@ import com.example.kotlinfrontend.ui.common.UiFormatters
 import com.example.kotlinfrontend.ui.common.appViewModelFactory
 import com.example.kotlinfrontend.ui.components.EditorialTextField
 import com.example.kotlinfrontend.ui.components.EmptyStateCard
-import com.example.kotlinfrontend.ui.components.GestureThumbnail
 import com.example.kotlinfrontend.ui.components.InlineBanner
 import com.example.kotlinfrontend.ui.components.ScreenTopBar
 import com.example.kotlinfrontend.ui.components.StatusAssistChip
@@ -237,16 +236,9 @@ private fun DictionaryCard(
         androidx.compose.foundation.layout.Column(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            GestureThumbnail(
-                label = entry.englishWord,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(148.dp)
-                    .padding(horizontal = 12.dp, vertical = 12.dp)
-            )
             androidx.compose.foundation.layout.Column(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -298,15 +290,9 @@ private fun DictionaryEntrySheet(
     androidx.compose.foundation.layout.Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 10.dp),
+            .padding(horizontal = 24.dp, vertical = 32.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        GestureThumbnail(
-            label = entry.englishWord,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(180.dp)
-        )
         Text(
             text = entry.englishWord,
             style = MaterialTheme.typography.headlineSmall,
