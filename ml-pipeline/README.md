@@ -2,6 +2,9 @@
 
 **SignSpeak_ML_Pipeline** is a comprehensive machine learning pipeline for Pakistan Sign Language (PSL) recognition. This repository contains tools for data collection, model training, and real-time inference using MediaPipe landmark detection and LSTM neural networks.
 
+> [!IMPORTANT]
+> **Environment Compatibility Note:** Current models are converted to a legacy format (`_legacy.h5`) for compatibility with the current **TensorFlow 2.15** environment. We plan to upgrade the entire pipeline to **TensorFlow 2.16+ (Keras 3)** in the near future.
+
 ### The Dataset is live @ the following links:
 - [**Kaggle**](https://www.kaggle.com/datasets/mohib123456/dynamic-word-level-pakistan-sign-language-dataset/data)
 - [**HuggingFace**](https://huggingface.co/datasets/mohibkhansherwani/DynamicWordLevelPakistanSignLanguageDataset)

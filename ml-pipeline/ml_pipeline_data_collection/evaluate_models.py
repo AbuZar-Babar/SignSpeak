@@ -11,8 +11,8 @@ from sklearn.model_selection import train_test_split
 from actions_config import load_actions, SEQUENCE_LENGTH
 from train_combined import load_combined_data, DATA_SOURCES
 
-MODEL_BASELINE    = "all_models/action_model_baseline_new.h5"
-MODEL_AUGMENTED   = "all_models/action_model_augmented_new.h5"
+MODEL_BASELINE    = "all_models/action_model_baseline_legacy.h5"
+MODEL_AUGMENTED   = "all_models/action_model_augmented_legacy.h5"
 ENCODER_BASELINE  = "all_models/label_encoder_baseline_new.pkl"
 ENCODER_AUGMENTED = "all_models/label_encoder_augmented_new.pkl"
 
@@ -31,7 +31,7 @@ def run_diagnostics(model_path, encoder_path, mode_name):
         return None
 
     print(f"\nLoading model: {os.path.basename(model_path)}")
-    model = load_model(model_path)
+    model = load_model(model_path, compile=False)
     le = joblib.load(encoder_path)
     actions = le.classes_
     

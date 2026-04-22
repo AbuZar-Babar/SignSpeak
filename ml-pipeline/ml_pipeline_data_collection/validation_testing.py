@@ -51,7 +51,7 @@ DATA_SOURCES = {
 }
 ALL_SOURCES = list(DATA_SOURCES.values())
 
-MODEL_AUGMENTED = os.path.join("all_models", "action_model_augmented_new.h5")
+MODEL_AUGMENTED = os.path.join("all_models", "action_model_augmented_legacy.h5")
 ENCODER_AUGMENTED = os.path.join("all_models", "label_encoder_augmented_new.pkl")
 
 OUTPUT_DIR = os.path.join(SCRIPT_DIR, "validation_results")
@@ -494,7 +494,7 @@ def pretrained_model_evaluation(actions):
         print(f"  [!] Model not found: {MODEL_AUGMENTED}")
         return None
 
-    model = load_model(MODEL_AUGMENTED)
+    model = load_model(MODEL_AUGMENTED, compile=False)
     le = joblib.load(ENCODER_AUGMENTED)
     class_names = le.classes_
 

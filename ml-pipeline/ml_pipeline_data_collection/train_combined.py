@@ -23,8 +23,8 @@ from data_augmentation import create_augmented_dataset
 from training_logger import log_training_session, log_comparison_session
 
 MODEL_DIR = "all_models"
-MODEL_BASELINE    = os.path.join(MODEL_DIR, "action_model_baseline_new.h5")
-MODEL_AUGMENTED   = os.path.join(MODEL_DIR, "action_model_augmented_new.h5")
+MODEL_BASELINE    = os.path.join(MODEL_DIR, "action_model_baseline_legacy.h5")
+MODEL_AUGMENTED   = os.path.join(MODEL_DIR, "action_model_augmented_legacy.h5")
 ENCODER_BASELINE  = os.path.join(MODEL_DIR, "label_encoder_baseline_new.pkl")
 ENCODER_AUGMENTED = os.path.join(MODEL_DIR, "label_encoder_augmented_new.pkl")
 

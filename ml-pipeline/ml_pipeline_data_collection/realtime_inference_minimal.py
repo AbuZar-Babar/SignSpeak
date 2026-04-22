@@ -10,11 +10,11 @@ import os
 from actions_config import load_actions, SEQUENCE_LENGTH, PREDICTION_THRESHOLD
 
 def main():
-    model_path = "all_models/action_model_baseline_new.h5"
+    model_path = "all_models/action_model_baseline_legacy.h5"
     encoder_path = "all_models/label_encoder_baseline_new.pkl"
     print(f"Loading {model_path}...")
     actions = load_actions()
-    model = load_model(model_path)
+    model = load_model(model_path, compile=False)
     le = joblib.load(encoder_path)
 
     sequence = []

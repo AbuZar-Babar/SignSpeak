@@ -12,11 +12,11 @@ FEATURES_PER_FRAME = 126
 
 MODEL_ARTIFACTS = {
     "baseline": {
-        "model_path": "all_models/action_model_baseline_new.h5",
+        "model_path": "all_models/action_model_baseline_legacy.h5",
         "encoder_path": "all_models/label_encoder_baseline_new.pkl",
     },
     "augmented": {
-        "model_path": "all_models/action_model_augmented_new.h5",
+        "model_path": "all_models/action_model_augmented_legacy.h5",
         "encoder_path": "all_models/label_encoder_augmented_new.pkl",
     }
 }
@@ -47,7 +47,7 @@ def convert_model(model_key: str, output_dir: Path, quantize: bool) -> None:
         raise FileNotFoundError(f"Missing encoder file: {encoder_path}")
 
     print(f"[{model_key}] Loading model from {model_path} ...")
-    model = load_model(str(model_path))
+    model = load_model(str(model_path), compile=False)
 
     mode_label = "quantized" if quantize else "float"
     print(f"[{model_key}] Converting to TensorFlow Lite ({mode_label}) ...")
