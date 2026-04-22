@@ -25,6 +25,8 @@ class PredictionAccumulator(
     private var lastCommitTimestampMs = -1L
     private var commitCount = 0
 
+    private val BLACKLISTED_WORDS = setOf("nothing", "test", "ready", "empty", "noise")
+
     @Synchronized
     fun reset(clearTranscript: Boolean = false) {
         predictionHistory.clear()
@@ -87,18 +89,30 @@ class PredictionAccumulator(
             (candidateAverageConfidence * 0.7f) + (candidateRelativeWeight * 0.3f)
             ).coerceIn(0f, 1f)
 
-        val shouldSwitch = displayedLabel == "--" ||
-            displayedLabel == candidateLabel ||
-            (
-                candidateStability >= 0.60f &&
-                    candidateDisplayConfidence >= 0.55f &&
-                    candidateCount >= 3
-                )
+        // Filter out unwanted words from being displayed or committed
+        val isBlacklisted = BLACKLISTED_WORDS.any { 
+            candidateLabel.equals(it, ignoreCase = true) || candidateLabel.contains(it, ignoreCase = true) 
+        }
+
+        val shouldSwitch = !isBlacklisted && (
+            displayedLabel == "--" ||
+                displayedLabel == candidateLabel ||
+                (
+                    candidateStability >= 0.75f && // Slightly more lenient stability
+                        candidateDisplayConfidence >= 0.82f && // High confidence to show on screen
+                        candidateCount >= 3 // Back to 3 samples for faster response
+                    )
+            )
 
         if (shouldSwitch) {
             displayedLabel = candidateLabel
             displayedConfidence = candidateDisplayConfidence
             displayedStability = candidateStability.coerceIn(0f, 1f)
+        } else if (isBlacklisted) {
+            // If blacklisted, fade toward null/-- state
+            displayedLabel = "--"
+            displayedConfidence = 0f
+            displayedStability = 0f
         } else {
             displayedConfidence = ((displayedConfidence * 0.8f) + (candidateDisplayConfidence * 0.2f))
                 .coerceIn(0f, 1f)
@@ -124,7 +138,9 @@ class PredictionAccumulator(
         if (displayedLabel == "--") {
             return
         }
-        if (displayedStability < 0.72f || displayedConfidence < 0.58f) {
+        
+        // Tightened commitment logic as requested (90% confidence)
+        if (displayedStability < 0.80f || displayedConfidence < 0.90f) {
             return
         }
 
@@ -133,6 +149,12 @@ class PredictionAccumulator(
 
         if (isNewToken && enoughTimeElapsed) {
             val token = displayedLabel.replace('_', ' ')
+            
+            // Final safety check for blacklisted words
+            if (BLACKLISTED_WORDS.any { token.equals(it, ignoreCase = true) || token.contains(it, ignoreCase = true) }) {
+                return
+            }
+
             transcriptTokens.add(token)
             if (transcriptTokens.size > 12) {
                 transcriptTokens.removeAt(0)

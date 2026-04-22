@@ -180,18 +180,6 @@ fun DictionaryWordCard(english: String, urdu: String) {
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFFE2E8F0)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Filled.PlayArrow, contentDescription = "Play Video", tint = Color(0xFF64748B))
-            }
-            
-            Spacer(modifier = Modifier.width(16.dp))
-            
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = english,
