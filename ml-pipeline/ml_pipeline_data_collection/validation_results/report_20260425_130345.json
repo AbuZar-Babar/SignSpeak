@@ -1,0 +1,148 @@
+{
+  "generated_at": "2026-04-25T13:53:25.407529",
+  "dataset_statistics": {
+    "total_sequences": 4370,
+    "num_classes": 63,
+    "class_counts": {
+      "hello": 70,
+      "assalam-o-alaikum": 69,
+      "thankyou": 70,
+      "nothing": 69,
+      "goodbye": 70,
+      "excuseme": 70,
+      "water": 70,
+      "bring": 70,
+      "airplane": 70,
+      "donttouch": 70,
+      "fan": 70,
+      "bench": 70,
+      "have_a_good_day": 70,
+      "we": 70,
+      "you": 70,
+      "door": 70,
+      "garden": 70,
+      "mine": 70,
+      "absolutely": 69,
+      "all": 70,
+      "both": 70,
+      "bulb": 70,
+      "mobile_phone": 70,
+      "generator": 70,
+      "aircrash": 70,
+      "goodmorning": 70,
+      "welldone": 70,
+      "ihaveacomplaint": 70,
+      "bear": 70,
+      "cow": 70,
+      "deer": 70,
+      "chimpanzee": 70,
+      "elephant": 70,
+      "dog": 70,
+      "policecar": 70,
+      "bicycle": 70,
+      "bridge": 70,
+      "cartoon": 70,
+      "color_pencils": 70,
+      "atm": 70,
+      "nailcutter": 70,
+      "shampoo": 70,
+      "razor": 70,
+      "shower": 70,
+      "tissue": 70,
+      "toothbrush": 70,
+      "toothpaste": 70,
+      "sunglasses": 70,
+      "beach": 70,
+      "lifejacket": 70,
+      "bald": 70,
+      "beard": 70,
+      "facelotion": 70,
+      "also": 70,
+      "bed": 70,
+      "cupboard": 70,
+      "beak": 70,
+      "crow": 70,
+      "peacock": 70,
+      "arrival": 70,
+      "umbrella": 70,
+      "left_hand": 70,
+      "test_word": 33
+    }
+  },
+  "kfold_cv": {
+    "mean_accuracy": 0.9729977116704805,
+    "fold_results": [
+      {
+        "fold": 1,
+        "accuracy": 0.9782608695652174
+      },
+      {
+        "fold": 2,
+        "accuracy": 0.9748283752860412
+      },
+      {
+        "fold": 3,
+        "accuracy": 0.9702517162471396
+      },
+      {
+        "fold": 4,
+        "accuracy": 0.9816933638443935
+      },
+      {
+        "fold": 5,
+        "accuracy": 0.959954233409611
+      }
+    ]
+  },
+  "cross_source": {
+    "laptop_to_mobile": {
+      "accuracy": 0.4774193548387097
+    },
+    "mobile_to_laptop": {
+      "accuracy": 0.3463258785942492
+    }
+  },
+  "pretrained_eval": {
+    "accuracy": 0.9965675057208238
+  },
+  "learning_curve": [
+    {
+      "fraction": 0.2,
+      "test_accuracy": 0.8432494279176201
+    },
+    {
+      "fraction": 0.4,
+      "test_accuracy": 0.9336384439359268
+    },
+    {
+      "fraction": 0.6,
+      "test_accuracy": 0.937070938215103
+    },
+    {
+      "fraction": 0.8,
+      "test_accuracy": 0.9450800915331807
+    },
+    {
+      "fraction": 1.0,
+      "test_accuracy": 0.9668192219679634
+    }
+  ],
+  "noise_robustness": [
+    {
+      "noise_std": 0.0,
+      "accuracy": 0.9965675057208238
+    },
+    {
+      "noise_std": 0.01,
+      "accuracy": 0.9965675057208238
+    },
+    {
+      "noise_std": 0.03,
+      "accuracy": 0.9965675057208238
+    },
+    {
+      "noise_std": 0.05,
+      "accuracy": 0.9965675057208238
+    }
+  ]
+}

@@ -34,49 +34,8 @@ DATA_SOURCES = [
     os.path.join(SCRIPT_DIR, "MP_Data"),
     os.path.join(SCRIPT_DIR, "MP_Data_mobile"),
 ]
-def load_combined_data(actions, data_sources):
-    sequences, labels = [], []
-    print("\nLoading combined data...")
-    for source_dir in data_sources:
-        name = os.path.basename(source_dir)
-        if not os.path.isdir(source_dir):
-            print(f"{name} not found - skipping")
-            continue
-        print(f"\n{name}")
-        source_count = 0
-        for action in actions:
-            action_path = os.path.join(source_dir, action)
-            if not os.path.isdir(action_path):
-                continue
-            seq_ids = sorted(
-                [d for d in os.listdir(action_path) if d.isdigit()],
-                key=int,
-            )
-            loaded, skipped = 0, 0
-            for seq_id in seq_ids:
-                window, ok = [], True
-                for frame_num in range(SEQUENCE_LENGTH):
-                    npy = os.path.join(action_path, seq_id, f"{frame_num}.npy")
-                    if not os.path.exists(npy):
-                        skipped += 1
-                        ok = False
-                        break
-                    window.append(np.load(npy))
-                if ok:
-                    sequences.append(window)
-                    labels.append(action)
-                    loaded += 1
-            note = f"({skipped} incomplete skipped)" if skipped else ""
-            print(f"• {action}: {loaded} sequences{note}")
-            source_count += loaded
-        print(f"→ {source_count} from {name}")
+from data_loader import load_data
 
-    if not sequences:
-        raise RuntimeError("No sequences loaded - check MP_Data / MP_Data_mobile.")
-
-    X, y = np.array(sequences), np.array(labels)
-    print(f"\nCombined: {len(X)} sequences, {X.shape[2]} features/frame")
-    return X, y
 def build_model(input_shape, num_classes, use_dropout=True):
     model = Sequential([
         LSTM(64,  return_sequences=True, activation="tanh", input_shape=input_shape),
@@ -102,7 +61,16 @@ def train_and_evaluate(actions, data_sources, use_augmentation,
     mode = "WITH AUGMENTATION" if use_augmentation else "BASELINE (No Augmentation)"
     print(f"Training: {mode}")
     print("=" * 70)
-    X, y = load_combined_data(actions, data_sources)
+    
+    # Load each source separately to hit the same individual caches used by model_evaluation.py
+    Xs, ys = [], []
+    for source in data_sources:
+        x_src, y_src = load_data(actions, [source])
+        Xs.append(x_src)
+        ys.append(y_src)
+    
+    X = np.concatenate(Xs)
+    y = np.concatenate(ys)
 
     if use_augmentation:
         print(f"\nApplying {augment_multiplier}x augmentation...")
