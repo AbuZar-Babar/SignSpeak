@@ -1,36 +1,18 @@
+# Environments
 venv/
-__pycache__/
-*.pyc
-.DS_Store
-.env
-.vscode/
-.idea/
-node_modules/
-.expo/
-*.log
-*.out
-*.err
-**/local.properties
-**/build/
-**/dist/
-*.apk
-
-SDD/
-SRS/
-# Python virtual environments
 .venv/
-venv/
-ENV/
 env/
+ENV/
+.env
 
-# Python cache and compiled files
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
+.Python
 
 # Distribution / packaging
-.Python
 build/
 develop-eggs/
 dist/
@@ -46,8 +28,6 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-
-# PyInstaller
 *.manifest
 *.spec
 
@@ -59,22 +39,31 @@ htmlcov/
 .tox/
 .hypothesis/
 
-# Jupyter Notebook
+# IDEs
+.vscode/
+.idea/
+.DS_Store
+
+# Mobile / Build
+node_modules/
+.expo/
+**/local.properties
+**/build/
+**/dist/
+*.apk
+
+# Jupyter
 .ipynb_checkpoints
 
-# Environment variables
-.env
-.venv
-venv/
-.DS_Store
+# ML Pipeline Data & Artifacts
 *.npy
+ml-pipeline/data/processed/*.joblib
+ml-pipeline/reports/
+ml-pipeline/logs/
+ml-pipeline/models/*.h5
+ml-pipeline/models/*.pkl
+ml-pipeline/.pytest_cache/
 
 # Documentation
 SDD/
 SRS/
-
-# Reports
-ml_pipeline_data_collection/comparison_reports/
-
-# Cache Files
-data_cache_*.joblib

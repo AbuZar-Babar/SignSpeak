@@ -67,7 +67,7 @@ python -m venv venv
 pip install -r requirements.txt
 
 # Run real-time inference
-python ml_pipeline_data_collection/realtime_inference_minimal.py
+python -m src.pipelines.inference_pipeline
 ```
 
 ## Team
