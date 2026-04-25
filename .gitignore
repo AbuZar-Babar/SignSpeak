@@ -75,3 +75,6 @@ SRS/
 
 # Reports
 ml_pipeline_data_collection/comparison_reports/
+
+# Cache Files
+data_cache_*.joblib
