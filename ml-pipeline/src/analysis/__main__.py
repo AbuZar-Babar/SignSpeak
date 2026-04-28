@@ -1,9 +1,6 @@
-#!/usr/bin/env python
-
 import sys
 import json
 import argparse
-from pathlib import Path
 from datetime import datetime
 
 from ..config.config import DATASET_FOLDERS, ACTIONS_FILE, PROJECT_ROOT
