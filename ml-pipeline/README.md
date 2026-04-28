@@ -14,6 +14,7 @@ ml-pipeline/
 │   ├── features/           # Feature engineering & augmentation logic
 │   ├── models/             # Model evaluation & export utilities
 │   ├── pipelines/          # End-to-end training & inference pipelines
+│   ├── analysis/           # EDA & data quality analysis
 │   └── utils/              # MediaPipe & logging helpers
 ├── data/                   # Data storage (Raw, Processed, External)
 ├── models/                 # Saved model artifacts (.h5, .tflite, .pkl)
@@ -73,10 +74,49 @@ Generate detailed performance reports, confusion matrices, and F1-score benchmar
 python -m src.models.evaluate
 ```
 
-### 5. TFLite Export
+### 5. Exploratory Data Analysis (EDA)
+Run comprehensive data quality checks, feature statistics, and cross-source validation:
+```powershell
+python -m src.analysis --output analysis_report.json
+```
+This generates a detailed JSON report including:
+- **Data Quality:** Missing frames, empty landmarks, coordinate range validation
+- **Feature Statistics:** Per-landmark statistics (mean, std, min, max), temporal evolution
+- **Cross-Source Analysis:** Compares laptop vs mobile data distributions (Kolmogorov-Smirnov tests)
+- **Augmentation Validation:** Checks augmented sample quality and validity
+
+### 6. TFLite Export
 Convert your trained Keras models to TFLite for mobile or edge deployment:
 ```powershell
 python -m src.models.export_model
+```
+
+### 7. Testing
+Run unit tests to verify core functionality, data integrity, and augmentation logic:
+
+**Run all tests:**
+```powershell
+pytest tests/
+```
+
+**Run specific test modules:**
+```powershell
+pytest tests/test_data_quality.py          # Data quality validation tests
+pytest tests/test_feature_stats.py         # Feature statistics tests
+pytest tests/test_cross_source.py          # Cross-source comparison tests
+pytest tests/test_augmentation_inspector.py # Augmentation validation tests
+pytest tests/test_feature_engineering.py   # Augmentation techniques tests
+pytest tests/test_ingestion.py             # Data ingestion tests
+```
+
+**Run with verbose output:**
+```powershell
+pytest tests/ -v
+```
+
+**Run with coverage report:**
+```powershell
+pytest tests/ --cov=src --cov-report=html
 ```
 
 ---
@@ -101,6 +141,18 @@ The project includes a GitHub Actions workflow (`.github/workflows/ci-cd.yml`) t
 To run tests locally:
 ```powershell
 pytest tests/
+```
+
+### 📊 Data Exploration & Quality Analysis
+The EDA module (`src/analysis/`) provides comprehensive data validation:
+- **Data Quality Checks:** Detects missing frames, empty landmarks, out-of-range coordinates, class imbalance
+- **Feature Statistics:** Computes per-landmark statistics, temporal motion analysis
+- **Cross-Source Validation:** Identifies domain gaps between laptop and mobile data using statistical tests
+- **Augmentation Validation:** Ensures augmented samples maintain data integrity
+
+Run the analysis anytime to understand your dataset:
+```powershell
+python -m src.analysis --output analysis_report.json
 ```
 
 ---
