@@ -91,6 +91,34 @@ Convert your trained Keras models to TFLite for mobile or edge deployment:
 python -m src.models.export_model
 ```
 
+### 7. Testing
+Run unit tests to verify core functionality, data integrity, and augmentation logic:
+
+**Run all tests:**
+```powershell
+pytest tests/
+```
+
+**Run specific test modules:**
+```powershell
+pytest tests/test_data_quality.py          # Data quality validation tests
+pytest tests/test_feature_stats.py         # Feature statistics tests
+pytest tests/test_cross_source.py          # Cross-source comparison tests
+pytest tests/test_augmentation_inspector.py # Augmentation validation tests
+pytest tests/test_feature_engineering.py   # Augmentation techniques tests
+pytest tests/test_ingestion.py             # Data ingestion tests
+```
+
+**Run with verbose output:**
+```powershell
+pytest tests/ -v
+```
+
+**Run with coverage report:**
+```powershell
+pytest tests/ --cov=src --cov-report=html
+```
+
 ---
 
 ## 🧠 Core MLOps Features
