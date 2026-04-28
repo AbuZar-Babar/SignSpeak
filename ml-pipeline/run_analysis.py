@@ -1,29 +1,15 @@
 #!/usr/bin/env python
-"""
-run_analysis.py
-================
-Comprehensive EDA and data quality analysis for SignSpeak ML pipeline.
-
-Usage:
-    python run_analysis.py --output analysis_report.json
-
-This script runs all analysis modules and generates a comprehensive report.
-"""
 
 import sys
-import os
 import json
 import argparse
 from pathlib import Path
 from datetime import datetime
 
-# Add ml-pipeline to path
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
-from src.config.config import (
-    DATA_SOURCES, PROJECT_ROOT, ACTIONS_FILE, PROCESSED_DATA_DIR
-)
+from src.config.config import DATA_SOURCES, ACTIONS_FILE
 from src.data.ingestion import load_data
 from src.analysis import (
     DataQualityAnalyzer,
@@ -35,45 +21,32 @@ from src.features.feature_engineering import SignLanguageAugmenter
 
 
 def load_actions() -> list:
-    """Load action names from file."""
     with open(ACTIONS_FILE, 'r') as f:
         return [line.strip() for line in f.readlines() if line.strip()]
 
 
 def run_full_analysis(output_file: str = "analysis_report.json"):
-    """
-    Run comprehensive EDA and data quality analysis.
-    
-    Args:
-        output_file: Path to save JSON report
-    """
     print("\n" + "="*70)
     print("SignSpeak ML Pipeline - Comprehensive EDA Analysis")
     print("="*70 + "\n")
     
     try:
-        # Load data
         print("[1/5] Loading data...")
         actions = load_actions()
         X, y = load_data(actions, [DATA_SOURCES["laptop"], DATA_SOURCES["mobile"]])
         print(f"      Loaded {X.shape[0]} sequences, {len(set(y))} classes")
         
-        # Data Quality Analysis
         print("\n[2/5] Running data quality checks...")
         dq_analyzer = DataQualityAnalyzer()
         dq_report = dq_analyzer.generate_full_report(X, y, actions)
-        dq_analyzer.print_summary()
         
-        # Feature Statistics
         print("[3/5] Computing feature statistics...")
         feat_analyzer = FeatureAnalyzer()
         feat_stats = feat_analyzer.per_landmark_statistics(X, y, actions)
         print(f"      Analyzed {feat_stats['num_landmarks']} landmarks")
         print(f"      Across {feat_stats['num_frames']} total frames")
         
-        # Cross-Source Analysis
         print("\n[4/5] Comparing laptop vs mobile sources...")
-        # Split data by source
         try:
             X_lap, y_lap = load_data(actions, [DATA_SOURCES["laptop"]])
             X_mob, y_mob = load_data(actions, [DATA_SOURCES["mobile"]])
@@ -84,7 +57,6 @@ def run_full_analysis(output_file: str = "analysis_report.json"):
             print(f"      Warning: Could not compare sources - {e}")
             cross_source_report = None
         
-        # Augmentation Validation
         print("\n[5/5] Validating augmentation quality...")
         augmenter = SignLanguageAugmenter()
         X_aug, y_aug = augmenter.create_augmented_dataset(X, y, multiplier=2)
@@ -92,7 +64,6 @@ def run_full_analysis(output_file: str = "analysis_report.json"):
         print(f"      Generated {X_aug.shape[0]} augmented samples")
         print(f"      Valid samples: {aug_validation['valid_samples']}/{aug_validation['total_samples']}")
         
-        # Compile full report
         report = {
             "timestamp": datetime.now().isoformat(),
             "dataset": {
@@ -110,7 +81,6 @@ def run_full_analysis(output_file: str = "analysis_report.json"):
         if cross_source_report:
             report["cross_source_analysis"] = cross_source_report
         
-        # Save report
         with open(output_file, 'w') as f:
             json.dump(report, f, indent=2)
         
@@ -139,6 +109,5 @@ if __name__ == "__main__":
     )
     
     args = parser.parse_args()
-    
     report = run_full_analysis(args.output)
     sys.exit(0 if report else 1)

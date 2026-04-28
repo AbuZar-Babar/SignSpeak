@@ -1,9 +1,3 @@
-"""
-Data Quality Analyzer
-======================
-Validates data integrity for the PSL sign language dataset.
-"""
-
 import numpy as np
 from typing import Dict, List, Any
 from collections import Counter
@@ -11,30 +5,13 @@ import json
 
 
 class DataQualityAnalyzer:
-    """
-    Validates data quality for sign language datasets.
-    """
-    
     def __init__(self, sequence_length: int = 60, coordinate_dim: int = 126):
-        """Initialize analyzer."""
         self.sequence_length = sequence_length
         self.coordinate_dim = coordinate_dim
     
     def detect_empty_landmarks(self, X: np.ndarray, y: np.ndarray,
-                              action_names: List[str], 
-                              threshold: float = 0.95) -> Dict[str, Any]:
-        """
-        Detect frames where landmarks are missing/zeroed out.
-        
-        Args:
-            X: Data array of shape (N, seq_len, features)
-            y: Labels array
-            action_names: List of action names
-            threshold: Percentage threshold for flagging empty frames
-        
-        Returns:
-            Dict with empty frame statistics
-        """
+                               action_names: List[str], 
+                               threshold: float = 0.95) -> Dict[str, Any]:
         empty_sequences = []
         total_frames = 0
         empty_frames = 0
@@ -44,14 +21,14 @@ class DataQualityAnalyzer:
             total_frames += n_frames
             
             empty_frame_count = 0
-            for frame_idx, frame in enumerate(seq):
+            for frame in seq:
                 zero_ratio = np.sum(frame == 0) / len(frame)
                 if zero_ratio >= threshold:
                     empty_frame_count += 1
                     empty_frames += 1
             
             if empty_frame_count > 0:
-                action = action_names[y[seq_idx]] if y[seq_idx] < len(action_names) else f"unknown_{y[seq_idx]}"
+                action = action_names[int(y[seq_idx])] if int(y[seq_idx]) < len(action_names) else f"unknown_{y[seq_idx]}"
                 empty_sequences.append({
                     "sequence_id": seq_idx,
                     "action": action,
@@ -60,18 +37,15 @@ class DataQualityAnalyzer:
                     "empty_ratio": empty_frame_count / n_frames
                 })
         
-        report = {
+        return {
             "total_frames_analyzed": total_frames,
             "empty_frames_count": empty_frames,
             "empty_frames_ratio": empty_frames / total_frames if total_frames > 0 else 0,
             "sequences_with_empty_frames": len(empty_sequences),
             "problematic_sequences": empty_sequences
         }
-        
-        return report
     
     def validate_coordinate_ranges(self, X: np.ndarray) -> Dict[str, Any]:
-        """Ensure all coordinates are within valid range [0, 1]."""
         issues = []
         out_of_range_samples = np.where((X < 0) | (X > 1))
         
@@ -90,7 +64,7 @@ class DataQualityAnalyzer:
                     "max_value": float(max_val)
                 })
         
-        report = {
+        return {
             "min_coordinate": float(np.min(X)),
             "max_coordinate": float(np.max(X)),
             "mean_coordinate": float(np.mean(X)),
@@ -99,12 +73,9 @@ class DataQualityAnalyzer:
             "out_of_range_sequences": len(issues),
             "problematic_sequences": issues
         }
-        
-        return report
     
     def report_class_distribution(self, y: np.ndarray, 
                                  action_names: List[str]) -> Dict[str, Any]:
-        """Generate class distribution and imbalance report."""
         class_counts = Counter(y)
         total_samples = len(y)
         sorted_classes = sorted(class_counts.items(), key=lambda x: x[1], reverse=True)
@@ -127,7 +98,7 @@ class DataQualityAnalyzer:
         counts_array = np.array([count for _, count in sorted_classes])
         imbalance_ratio = counts_array.max() / counts_array.min() if counts_array.min() > 0 else float('inf')
         
-        report = {
+        return {
             "total_samples": total_samples,
             "num_classes": len(class_counts),
             "samples_per_class": class_dist,
@@ -137,5 +108,50 @@ class DataQualityAnalyzer:
             "minority_class_count": int(counts_array.min()) if len(counts_array) > 0 else 0,
             "majority_class_count": int(counts_array.max()) if len(counts_array) > 0 else 0
         }
-        
+    
+    def generate_full_report(self, X: np.ndarray, y: np.ndarray,
+                            action_names: List[str]) -> Dict[str, Any]:
+        report = {
+            "dataset_shape": {
+                "n_sequences": X.shape[0],
+                "frames_per_sequence": X.shape[1],
+                "features_per_frame": X.shape[2]
+            },
+            "missing_frames": self.check_missing_frames(X, y, action_names),
+            "empty_landmarks": self.detect_empty_landmarks(X, y, action_names),
+            "coordinate_ranges": self.validate_coordinate_ranges(X),
+            "class_distribution": self.report_class_distribution(y, action_names),
+            "timestamp": np.datetime64('now').astype(str)
+        }
         return report
+    
+    def check_missing_frames(self, X: np.ndarray, y: np.ndarray, 
+                            action_names: List[str]) -> Dict[str, Any]:
+        n_sequences = X.shape[0]
+        expected_len = self.sequence_length
+        issues = []
+        
+        for idx, seq in enumerate(X):
+            actual_len = seq.shape[0]
+            if actual_len != expected_len:
+                action = action_names[int(y[idx])] if int(y[idx]) < len(action_names) else f"unknown_{y[idx]}"
+                issues.append({
+                    "sequence_id": idx,
+                    "action": action,
+                    "expected_frames": expected_len,
+                    "actual_frames": actual_len,
+                    "missing": expected_len - actual_len
+                })
+        
+        return {
+            "total_sequences": n_sequences,
+            "valid_sequences": n_sequences - len(issues),
+            "problematic_sequences": len(issues),
+            "issues": issues
+        }
+    
+    def print_summary(self):
+        report = self.generate_full_report(None, None, [])
+        print("\n" + "="*70)
+        print("DATA QUALITY REPORT")
+        print("="*70 + "\n")
