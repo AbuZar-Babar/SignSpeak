@@ -11,12 +11,10 @@ sys.path.insert(0, str(project_root))
 
 from src.config.config import DATA_SOURCES, ACTIONS_FILE
 from src.data.ingestion import load_data
-from src.analysis import (
-    DataQualityAnalyzer,
-    FeatureAnalyzer,
-    compare_sources,
-    validate_augmented_samples,
-)
+from src.analysis.data_quality import DataQualityAnalyzer
+from src.analysis.feature_stats import FeatureAnalyzer
+from src.analysis.cross_source import compare_sources
+from src.analysis.augmentation_inspector import validate_augmented_samples
 from src.features.feature_engineering import SignLanguageAugmenter
 
 
