@@ -70,6 +70,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -663,7 +665,8 @@ fun LiveCameraScreen(
             refreshBackendHealth(updateStatusText = false)
         }
         sentenceModeEnabled = false
-        sentenceLanguage = SentenceLanguage.BOTH
+        // Restore previously chosen output language (persisted across sessions)
+        sentenceLanguage = backendSettingsRepository.sentenceLanguageFlow.first()
         backendSettingsRepository.saveSentenceModeEnabled(false)
     }
 
@@ -707,14 +710,56 @@ fun LiveCameraScreen(
             (inferenceMode == InferenceMode.ON_DEVICE || (isBackendReachable && !isBackendChecking))
     }
     val currentDrawerModelOptionsContent by rememberUpdatedState<(@Composable () -> Unit)?>(
-        if (!productMode) {
-            {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+        {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // ── Output Language toggle (visible in all modes) ─────────────
+                SettingsSectionLabel("Output Language")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    CameraOptionChip(
+                        label = "English",
+                        selected = sentenceLanguage == SentenceLanguage.ENGLISH,
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            sentenceLanguage = SentenceLanguage.ENGLISH
+                            coroutineScope.launch {
+                                backendSettingsRepository.saveSentenceLanguage(SentenceLanguage.ENGLISH)
+                            }
+                        }
+                    )
+                    CameraOptionChip(
+                        label = "اردو",
+                        selected = sentenceLanguage == SentenceLanguage.URDU,
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            sentenceLanguage = SentenceLanguage.URDU
+                            coroutineScope.launch {
+                                backendSettingsRepository.saveSentenceLanguage(SentenceLanguage.URDU)
+                            }
+                        }
+                    )
+                    CameraOptionChip(
+                        label = "Both",
+                        selected = sentenceLanguage == SentenceLanguage.BOTH,
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            sentenceLanguage = SentenceLanguage.BOTH
+                            coroutineScope.launch {
+                                backendSettingsRepository.saveSentenceLanguage(SentenceLanguage.BOTH)
+                            }
+                        }
+                    )
+                }
+
+                // ── Advanced settings (dev / non-product mode only) ──────────
+                if (!productMode) {
                     SettingsSectionLabel("Advanced")
                     SettingsToggleRow(
                         label = "Speed Mode",
@@ -776,8 +821,6 @@ fun LiveCameraScreen(
                     }
                 }
             }
-        } else {
-            null
         }
     )
     SideEffect {
@@ -899,13 +942,14 @@ fun LiveCameraScreen(
                     ) {
                         Icon(Icons.Rounded.Cameraswitch, contentDescription = "Flip camera")
                     }
-                    // Torch (back camera only)
+
+                    // Torch control
                     if (!useFrontCamera) {
                         FilledTonalIconButton(
                             onClick = { torchEnabled = !torchEnabled },
                             colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                containerColor = if (torchEnabled) Color(0xFFFCD400) else Color(0xF2FFFCF5),
-                                contentColor   = Color(0xFF1F5100)
+                                containerColor = if (torchEnabled) Color(0xFF58CC02) else Color(0xF2FFFCF5),
+                                contentColor   = if (torchEnabled) Color.White else Color(0xFF1F5100)
                             )
                         ) {
                             Icon(
@@ -935,7 +979,9 @@ fun LiveCameraScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = if (predictedText == "--") "Waiting…" else predictedText,
+                                text = if (predictedText == "--") {
+                                    if (sentenceLanguage == SentenceLanguage.URDU) "انتظار کریں..." else "Waiting…"
+                                } else LabelTranslator.formatLabel(predictedText, sentenceLanguage),
                                 style = MaterialTheme.typography.headlineSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White,
@@ -950,6 +996,7 @@ fun LiveCameraScreen(
                                 color = Color(0xFF58CC02)
                             )
                         }
+
                         // Confidence bar
                         if (confidence > 0f) {
                             LinearProgressIndicator(
@@ -962,6 +1009,7 @@ fun LiveCameraScreen(
                                 trackColor = Color(0x3358CC02)
                             )
                         }
+
                         // Transcript row
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -969,7 +1017,7 @@ fun LiveCameraScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = if (transcript.isBlank()) "—" else transcript,
+                                text = if (transcript.isBlank()) "—" else LabelTranslator.formatTranscript(transcript, sentenceLanguage),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = Color(0xFFCCE5FF),
                                 modifier = Modifier.weight(1f),
@@ -1029,7 +1077,7 @@ fun LiveCameraScreen(
                                             trackColor = Color(0x33FFFFFF)
                                         )
                                         Text(
-                                            text = "Forming sentence…",
+                                            text = if (sentenceLanguage == SentenceLanguage.URDU) "جملہ بن رہا ہے..." else "Forming sentence…",
                                             style = MaterialTheme.typography.labelSmall,
                                             color = Color(0xFFCCE5FF)
                                         )
