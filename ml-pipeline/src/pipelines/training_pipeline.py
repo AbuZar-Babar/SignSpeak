@@ -89,7 +89,8 @@ def train_and_evaluate(actions, data_sources, use_augmentation,
         y_cat.shape[1],
         use_dropout=use_augmentation,
     )
-
+    # EarlyStopping (stop training if validation accuracy doesn't improve after 30 seconds)
+    # ReduceLROnPlateau (reduce learning rate by half if validation loss doesn't improve)
     callbacks = [
         EarlyStopping(monitor="val_accuracy", patience=30, mode="max",
                       restore_best_weights=True, verbose=1),
