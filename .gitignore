@@ -67,3 +67,5 @@ ml-pipeline/.pytest_cache/
 # Documentation
 SDD/
 SRS/
+
+.obsidian
