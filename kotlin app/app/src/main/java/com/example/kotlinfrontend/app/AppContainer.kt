@@ -3,6 +3,7 @@ package com.example.kotlinfrontend.app
 import android.content.Context
 import com.example.kotlinfrontend.data.local.AppLocalStore
 import com.example.kotlinfrontend.data.local.SeedDictionaryDataSource
+import com.example.kotlinfrontend.TranslationCatalog
 import com.example.kotlinfrontend.data.remote.SupabaseService
 import com.example.kotlinfrontend.data.repository.AuthRepository
 import com.example.kotlinfrontend.data.repository.BookmarkRepository
@@ -17,12 +18,22 @@ import com.example.kotlinfrontend.data.repository.HistoryRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.runBlocking
 
 class AppContainer(context: Context) {
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val supabaseService = SupabaseService()
     val localStore = AppLocalStore(context)
     private val seedDictionaryDataSource = SeedDictionaryDataSource(context)
+
+    init {
+        runCatching {
+            val entries = runBlocking(Dispatchers.IO) {
+                seedDictionaryDataSource.load()
+            }
+            TranslationCatalog.initialize(entries)
+        }
+    }
 
     val authRepository: AuthRepository = DefaultAuthRepository(
         appScope = appScope,
