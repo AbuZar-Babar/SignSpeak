@@ -27,6 +27,7 @@ data class AccountUiState(
     val fullName: String = "",
     val email: String = "",
     val password: String = "",
+    val inviteCode: String = "",
     val isWorking: Boolean = false,
     val isLoadingData: Boolean = false,
     val bookmarks: List<DictionaryEntry> = emptyList(),
@@ -74,6 +75,10 @@ class AccountViewModel(
         _uiState.update { current -> current.copy(password = value) }
     }
 
+    fun updateInviteCode(value: String) {
+        _uiState.update { current -> current.copy(inviteCode = value.uppercase()) }
+    }
+
     fun dismissMessage() {
         _uiState.update { current -> current.copy(message = null) }
     }
@@ -117,7 +122,8 @@ class AccountViewModel(
                 AccountAuthMode.REGISTER -> authRepository.signUp(
                     email = state.email,
                     password = state.password,
-                    fullName = state.fullName
+                    fullName = state.fullName,
+                    inviteCode = state.inviteCode.ifBlank { null }
                 )
                 AccountAuthMode.RESET -> authRepository.sendPasswordReset(state.email)
             }
@@ -126,6 +132,7 @@ class AccountViewModel(
                 current.copy(
                     isWorking = false,
                     password = if (result.isSuccess) "" else current.password,
+                    inviteCode = if (result.isSuccess && state.authMode == AccountAuthMode.REGISTER) "" else current.inviteCode,
                     message = result.fold(
                         onSuccess = {
                             when (state.authMode) {
@@ -139,6 +146,32 @@ class AccountViewModel(
                         onFailure = { it.message ?: "Authentication request failed." }
                     )
                 )
+            }
+        }
+    }
+
+    fun joinOrganization() {
+        viewModelScope.launch {
+            val inviteCode = uiState.value.inviteCode.trim()
+            if (inviteCode.isBlank()) {
+                _uiState.update { current -> current.copy(message = "Enter an institute invite code.") }
+                return@launch
+            }
+
+            _uiState.update { current -> current.copy(isWorking = true, message = null) }
+            val result = authRepository.joinOrganization(inviteCode)
+            _uiState.update { current ->
+                current.copy(
+                    isWorking = false,
+                    inviteCode = if (result.isSuccess) "" else current.inviteCode,
+                    message = result.fold(
+                        onSuccess = { "Institute linked to your account." },
+                        onFailure = { it.message ?: "Unable to join institute." }
+                    )
+                )
+            }
+            if (result.isSuccess) {
+                loadUserData()
             }
         }
     }

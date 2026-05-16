@@ -1,7 +1,17 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, supabaseConfigError } from './lib/supabase';
-import type { ComplaintRow, ComplaintSource, ComplaintStatus, UserRole } from './types';
+import type {
+  ComplaintRow,
+  ComplaintSource,
+  ComplaintStatus,
+  OrganizationDailyUsageRow,
+  OrganizationOverviewRow,
+  OrganizationRow,
+  OrganizationTopSignRow,
+  OrganizationUserRow,
+  UserRole,
+} from './types';
 
 type StatusFilter = 'all' | ComplaintStatus;
 type SourceFilter = 'all' | ComplaintSource;
@@ -218,6 +228,26 @@ export default function App() {
   const [role, setRole] = useState<UserRole | null>(null);
   const [profileName, setProfileName] = useState('');
   const [roleLoading, setRoleLoading] = useState(true);
+  const [organizations, setOrganizations] = useState<OrganizationRow[]>([]);
+  const [selectedOrganizationId, setSelectedOrganizationId] = useState<string>('');
+  const [organizationsLoading, setOrganizationsLoading] = useState(false);
+  const [organizationsError, setOrganizationsError] = useState<string | null>(null);
+  const [organizationRefreshKey, setOrganizationRefreshKey] = useState(0);
+  const [organizationName, setOrganizationName] = useState('');
+  const [organizationCity, setOrganizationCity] = useState('');
+  const [organizationEmail, setOrganizationEmail] = useState('');
+  const [organizationWebsite, setOrganizationWebsite] = useState('');
+  const [organizationBusy, setOrganizationBusy] = useState(false);
+  const [organizationNotice, setOrganizationNotice] = useState<string | null>(null);
+  const [organizationUsers, setOrganizationUsers] = useState<OrganizationUserRow[]>([]);
+  const [organizationOverview, setOrganizationOverview] =
+    useState<OrganizationOverviewRow | null>(null);
+  const [organizationTopSigns, setOrganizationTopSigns] = useState<OrganizationTopSignRow[]>([]);
+  const [organizationDailyUsage, setOrganizationDailyUsage] = useState<OrganizationDailyUsageRow[]>(
+    [],
+  );
+  const [organizationDataLoading, setOrganizationDataLoading] = useState(false);
+  const [organizationDataError, setOrganizationDataError] = useState<string | null>(null);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -287,6 +317,12 @@ export default function App() {
       if (!nextSession) {
         setRole(null);
         setProfileName('');
+        setOrganizations([]);
+        setSelectedOrganizationId('');
+        setOrganizationUsers([]);
+        setOrganizationOverview(null);
+        setOrganizationTopSigns([]);
+        setOrganizationDailyUsage([]);
         setComplaints([]);
         setSelectedComplaintId(null);
         setRoleLoading(false);
@@ -350,7 +386,58 @@ export default function App() {
 
   useEffect(() => {
     const client = supabase;
-    if (!client || role !== 'admin') {
+    if (!client || !session?.user.id || roleLoading) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadOrganizations = async () => {
+      setOrganizationsLoading(true);
+      setOrganizationsError(null);
+
+      const { data, error } = await client.rpc('admin_list_my_organizations');
+
+      if (cancelled) {
+        return;
+      }
+
+      if (error) {
+        setOrganizations([]);
+        setSelectedOrganizationId('');
+        setOrganizationsError(error.message);
+        setOrganizationsLoading(false);
+        return;
+      }
+
+      const rows = (data ?? []) as OrganizationRow[];
+      setOrganizations(rows);
+      setSelectedOrganizationId((currentId) => {
+        if (!rows.length) {
+          return '';
+        }
+
+        return rows.some((row) => row.id === currentId) ? currentId : rows[0].id;
+      });
+      setOrganizationsLoading(false);
+    };
+
+    void loadOrganizations();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user.id, roleLoading, organizationRefreshKey]);
+
+  useEffect(() => {
+    const client = supabase;
+    if (!client || !session?.user.id || roleLoading) {
+      return;
+    }
+
+    if (role !== 'admin' && !selectedOrganizationId) {
+      setComplaints([]);
+      setSelectedComplaintId(null);
       return;
     }
 
@@ -364,6 +451,7 @@ export default function App() {
         status_filter: statusFilter === 'all' ? null : statusFilter,
         source_filter: sourceFilter === 'all' ? null : sourceFilter,
         search_query: searchTerm.trim() || null,
+        organization_filter: selectedOrganizationId || null,
       });
 
       if (cancelled) {
@@ -395,12 +483,96 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [role, statusFilter, sourceFilter, searchTerm, refreshKey]);
+  }, [
+    role,
+    roleLoading,
+    selectedOrganizationId,
+    session?.user.id,
+    statusFilter,
+    sourceFilter,
+    searchTerm,
+    refreshKey,
+  ]);
 
   const selectedComplaint = useMemo(
     () => complaints.find((complaint) => complaint.id === selectedComplaintId) ?? null,
     [complaints, selectedComplaintId],
   );
+
+  const selectedOrganization = useMemo(
+    () => organizations.find((organization) => organization.id === selectedOrganizationId) ?? null,
+    [organizations, selectedOrganizationId],
+  );
+
+  useEffect(() => {
+    const client = supabase;
+    if (!client || !selectedOrganizationId) {
+      setOrganizationUsers([]);
+      setOrganizationOverview(null);
+      setOrganizationTopSigns([]);
+      setOrganizationDailyUsage([]);
+      setOrganizationDataLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadOrganizationData = async () => {
+      setOrganizationDataLoading(true);
+      setOrganizationDataError(null);
+
+      const [overviewResult, usersResult, topSignsResult, dailyUsageResult] = await Promise.all([
+        client.rpc('admin_get_organization_overview', {
+          target_organization_id: selectedOrganizationId,
+        }),
+        client.rpc('admin_list_organization_users', {
+          target_organization_id: selectedOrganizationId,
+        }),
+        client.rpc('admin_list_organization_top_signs', {
+          target_organization_id: selectedOrganizationId,
+          result_limit: 8,
+        }),
+        client.rpc('admin_list_organization_daily_usage', {
+          target_organization_id: selectedOrganizationId,
+          day_limit: 14,
+        }),
+      ]);
+
+      if (cancelled) {
+        return;
+      }
+
+      const firstError =
+        overviewResult.error ||
+        usersResult.error ||
+        topSignsResult.error ||
+        dailyUsageResult.error;
+
+      if (firstError) {
+        setOrganizationUsers([]);
+        setOrganizationOverview(null);
+        setOrganizationTopSigns([]);
+        setOrganizationDailyUsage([]);
+        setOrganizationDataError(firstError.message);
+        setOrganizationDataLoading(false);
+        return;
+      }
+
+      setOrganizationOverview(
+        ((overviewResult.data ?? []) as OrganizationOverviewRow[])[0] ?? null,
+      );
+      setOrganizationUsers((usersResult.data ?? []) as OrganizationUserRow[]);
+      setOrganizationTopSigns((topSignsResult.data ?? []) as OrganizationTopSignRow[]);
+      setOrganizationDailyUsage((dailyUsageResult.data ?? []) as OrganizationDailyUsageRow[]);
+      setOrganizationDataLoading(false);
+    };
+
+    void loadOrganizationData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedOrganizationId, organizationRefreshKey, refreshKey]);
 
   useEffect(() => {
     if (!selectedComplaint) {
@@ -435,6 +607,14 @@ export default function App() {
   const pendingCount = complaintMetrics.open + complaintMetrics.reviewing;
   const filteredResultLabel =
     complaints.length === 1 ? '1 complaint in scope' : `${complaints.length} complaints in scope`;
+  const maxDailyTranslations = useMemo(
+    () =>
+      organizationDailyUsage.reduce(
+        (maxValue, item) => Math.max(maxValue, Number(item.translation_count)),
+        0,
+      ),
+    [organizationDailyUsage],
+  );
 
   const toggleTheme = () => {
     setTheme((current) => (current === 'light' ? 'dark' : 'light'));
@@ -492,6 +672,76 @@ export default function App() {
     setAuthBusy(false);
   };
 
+  const handleCreateOrganization = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!supabase) {
+      return;
+    }
+
+    if (!organizationName.trim()) {
+      setOrganizationsError('Enter an institute name.');
+      return;
+    }
+
+    setOrganizationBusy(true);
+    setOrganizationsError(null);
+    setOrganizationNotice(null);
+
+    const { data, error } = await supabase.rpc('admin_create_organization', {
+      organization_name: organizationName.trim(),
+      organization_city: organizationCity.trim() || null,
+      organization_contact_email: organizationEmail.trim() || null,
+      organization_website_url: organizationWebsite.trim() || null,
+    });
+
+    if (error) {
+      setOrganizationsError(error.message);
+      setOrganizationBusy(false);
+      return;
+    }
+
+    const created = ((data ?? []) as Array<{ organization_id: string; invite_code: string }>)[0];
+    setOrganizationName('');
+    setOrganizationCity('');
+    setOrganizationEmail('');
+    setOrganizationWebsite('');
+    setOrganizationNotice(
+      created?.invite_code
+        ? `Organization created. Invite code: ${created.invite_code}`
+        : 'Organization created.',
+    );
+    setSelectedOrganizationId(created?.organization_id ?? '');
+    setOrganizationRefreshKey((value) => value + 1);
+    setOrganizationBusy(false);
+  };
+
+  const rotateInviteCode = async () => {
+    if (!supabase || !selectedOrganizationId) {
+      return;
+    }
+
+    setOrganizationBusy(true);
+    setOrganizationsError(null);
+    setOrganizationNotice(null);
+
+    const { data, error } = await supabase.rpc('admin_rotate_organization_invite_code', {
+      target_organization_id: selectedOrganizationId,
+    });
+
+    if (error) {
+      setOrganizationsError(error.message);
+      setOrganizationBusy(false);
+      return;
+    }
+
+    const rotated = ((data ?? []) as Array<{ invite_code: string }>)[0];
+    setOrganizationNotice(
+      rotated?.invite_code ? `New invite code: ${rotated.invite_code}` : 'Invite code rotated.',
+    );
+    setOrganizationRefreshKey((value) => value + 1);
+    setOrganizationBusy(false);
+  };
+
   const handleSignOut = async () => {
     if (!supabase) {
       return;
@@ -500,6 +750,12 @@ export default function App() {
     await supabase.auth.signOut();
     setRole(null);
     setProfileName('');
+    setOrganizations([]);
+    setSelectedOrganizationId('');
+    setOrganizationUsers([]);
+    setOrganizationOverview(null);
+    setOrganizationTopSigns([]);
+    setOrganizationDailyUsage([]);
     setComplaints([]);
     setSelectedComplaintId(null);
     setEmail('');
@@ -717,46 +973,6 @@ export default function App() {
     );
   }
 
-  if (role !== 'admin') {
-    return (
-      <main className="state-page">
-        <header className="restricted-nav">
-          <PortalBrand />
-          <div className="topbar-actions">
-            <button
-              aria-label="Toggle dark mode"
-              className="theme-toggle"
-              onClick={toggleTheme}
-              type="button"
-            >
-              <Icon name={theme === 'light' ? 'dark_mode' : 'light_mode'} />
-            </button>
-            <button className="secondary-button" onClick={handleSignOut} type="button">
-              Sign out
-            </button>
-          </div>
-        </header>
-
-        <section className="state-card">
-          <div className="state-icon state-icon-warning">
-            <Icon name="lock_person" />
-          </div>
-          <p className="eyebrow">Access restricted</p>
-          <h2 className="page-title">This account is not marked as an admin.</h2>
-          <p className="support-copy">
-            Promote the user in <code>public.profiles.role</code> and sign in again.
-          </p>
-          <div className="state-actions">
-            <button className="primary-button" onClick={handleSignOut} type="button">
-              <span>Return to sign in</span>
-              <Icon name="logout" />
-            </button>
-          </div>
-        </section>
-      </main>
-    );
-  }
-
   return (
     <div className="portal-shell">
       <aside className="portal-sidebar">
@@ -855,6 +1071,280 @@ export default function App() {
         </header>
 
         <main className="portal-content">
+          <section className="organization-panel panel">
+            <div className="organization-header">
+              <div>
+                <p className="eyebrow">Institute workspace</p>
+                <h3>
+                  {selectedOrganization
+                    ? selectedOrganization.name
+                    : 'Create or select an institute'}
+                </h3>
+                <p>
+                  Institute admins can create an organization, share the invite code, and review
+                  organization-scoped users and analytics.
+                </p>
+              </div>
+
+              <div className="organization-actions">
+                {organizations.length ? (
+                  <label>
+                    Active institute
+                    <div className="select-shell">
+                      <select
+                        onChange={(event) => {
+                          setSelectedOrganizationId(event.target.value);
+                          setRefreshKey((value) => value + 1);
+                        }}
+                        value={selectedOrganizationId}
+                      >
+                        {organizations.map((organization) => (
+                          <option key={organization.id} value={organization.id}>
+                            {organization.name}
+                          </option>
+                        ))}
+                      </select>
+                      <Icon name="expand_more" />
+                    </div>
+                  </label>
+                ) : null}
+
+                {selectedOrganization ? (
+                  <div className="invite-card">
+                    <span>Invite code</span>
+                    <strong>{selectedOrganization.invite_code || 'Not generated'}</strong>
+                    <button
+                      className="secondary-button"
+                      disabled={organizationBusy}
+                      onClick={rotateInviteCode}
+                      type="button"
+                    >
+                      Rotate code
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            <form className="organization-form" onSubmit={handleCreateOrganization}>
+              <label>
+                Institute name
+                <div className="field-shell">
+                  <Icon name="domain" />
+                  <input
+                    onChange={(event) => setOrganizationName(event.target.value)}
+                    placeholder="ABC Deaf School"
+                    value={organizationName}
+                  />
+                </div>
+              </label>
+
+              <label>
+                City
+                <div className="field-shell">
+                  <Icon name="location_city" />
+                  <input
+                    onChange={(event) => setOrganizationCity(event.target.value)}
+                    placeholder="Lahore"
+                    value={organizationCity}
+                  />
+                </div>
+              </label>
+
+              <label>
+                Contact email
+                <div className="field-shell">
+                  <Icon name="mail" />
+                  <input
+                    onChange={(event) => setOrganizationEmail(event.target.value)}
+                    placeholder="admin@school.edu.pk"
+                    type="email"
+                    value={organizationEmail}
+                  />
+                </div>
+              </label>
+
+              <label>
+                Website
+                <div className="field-shell">
+                  <Icon name="language" />
+                  <input
+                    onChange={(event) => setOrganizationWebsite(event.target.value)}
+                    placeholder="https://school.edu.pk"
+                    value={organizationWebsite}
+                  />
+                </div>
+              </label>
+
+              <button className="primary-button" disabled={organizationBusy} type="submit">
+                <span>{organizationBusy ? 'Creating...' : 'Create institute'}</span>
+                <Icon name="add_business" />
+              </button>
+            </form>
+
+            {organizationsLoading ? (
+              <p className="inline-feedback inline-feedback-success">Loading organizations...</p>
+            ) : null}
+            {organizationsError ? (
+              <p className="inline-feedback inline-feedback-error">{organizationsError}</p>
+            ) : null}
+            {organizationNotice ? (
+              <p className="inline-feedback inline-feedback-success">{organizationNotice}</p>
+            ) : null}
+          </section>
+
+          {selectedOrganization ? (
+            <section className="organization-dashboard">
+              <div className="organization-metrics">
+                <article className="metric-card">
+                  <div className="metric-card-header">
+                    <div className="metric-icon metric-icon-reviewing">
+                      <Icon name="group" />
+                    </div>
+                    <span className="metric-chip">{selectedOrganization.status}</span>
+                  </div>
+                  <strong>{organizationOverview?.registered_users ?? 0}</strong>
+                  <span>Registered users</span>
+                  <small>{selectedOrganization.city || 'No city provided'}</small>
+                </article>
+
+                <article className="metric-card">
+                  <div className="metric-card-header">
+                    <div className="metric-icon metric-icon-resolved">
+                      <Icon name="verified_user" />
+                    </div>
+                    <span className="metric-chip">30 days</span>
+                  </div>
+                  <strong>{organizationOverview?.active_users_30d ?? 0}</strong>
+                  <span>Active users</span>
+                  <small>Students or staff with recent translations</small>
+                </article>
+
+                <article className="metric-card">
+                  <div className="metric-card-header">
+                    <div className="metric-icon metric-icon-pending">
+                      <Icon name="sign_language" />
+                    </div>
+                    <span className="metric-chip">30 days</span>
+                  </div>
+                  <strong>{organizationOverview?.translations_30d ?? 0}</strong>
+                  <span>Translations</span>
+                  <small>Synced institute usage</small>
+                </article>
+
+                <article className="metric-card">
+                  <div className="metric-card-header">
+                    <div className="metric-icon metric-icon-open">
+                      <Icon name="report" />
+                    </div>
+                    <span className="metric-chip">30 days</span>
+                  </div>
+                  <strong>{organizationOverview?.complaints_30d ?? 0}</strong>
+                  <span>Reports</span>
+                  <small>Dictionary and prediction complaints</small>
+                </article>
+              </div>
+
+              {organizationDataError ? (
+                <p className="inline-feedback inline-feedback-error">{organizationDataError}</p>
+              ) : null}
+
+              <div className="organization-insights">
+                <article className="panel organization-list-card">
+                  <div className="panel-heading">
+                    <div>
+                      <p className="eyebrow">Roster</p>
+                      <h3>
+                        {organizationUsers.length === 1
+                          ? '1 registered user'
+                          : `${organizationUsers.length} registered users`}
+                      </h3>
+                    </div>
+                    {organizationDataLoading ? <span className="loading-chip">Loading...</span> : null}
+                  </div>
+                  <div className="roster-table">
+                    {organizationUsers.length ? (
+                      organizationUsers.map((user) => (
+                        <div key={user.user_id} className="roster-row">
+                          <div>
+                            <strong>{user.full_name || user.email || 'Unnamed user'}</strong>
+                            <span>{user.email || user.user_id}</span>
+                          </div>
+                          <span>{user.role === 'org_admin' ? 'Admin' : 'Member'}</span>
+                          <span>{Number(user.translation_count)} translations</span>
+                          <span>{formatDate(user.last_active_at)}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="support-copy">No institute users yet.</p>
+                    )}
+                  </div>
+                </article>
+
+                <article className="panel organization-list-card">
+                  <div className="panel-heading">
+                    <div>
+                      <p className="eyebrow">Top signs</p>
+                      <h3>Most translated</h3>
+                    </div>
+                  </div>
+                  <div className="rank-list">
+                    {organizationTopSigns.length ? (
+                      organizationTopSigns.map((item, index) => (
+                        <div key={item.predicted_word_slug} className="rank-row">
+                          <span>#{index + 1}</span>
+                          <strong>{item.predicted_word_slug}</strong>
+                          <em>{Number(item.usage_count)}</em>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="support-copy">No synced translations in the last 30 days.</p>
+                    )}
+                  </div>
+                </article>
+
+                <article className="panel organization-list-card">
+                  <div className="panel-heading">
+                    <div>
+                      <p className="eyebrow">Usage trend</p>
+                      <h3>Daily translations</h3>
+                    </div>
+                  </div>
+                  <div className="usage-bars">
+                    {organizationDailyUsage.length ? (
+                      organizationDailyUsage.map((item) => (
+                        <div key={item.usage_date} className="usage-row">
+                          <span>{formatDate(item.usage_date).split(',')[0]}</span>
+                          <div className="progress-track">
+                            <div
+                              className="progress-value"
+                              style={{
+                                width: `${
+                                  maxDailyTranslations
+                                    ? Math.max(
+                                        8,
+                                        Math.round(
+                                          (Number(item.translation_count) / maxDailyTranslations) *
+                                            100,
+                                        ),
+                                      )
+                                    : 0
+                                }%`,
+                              }}
+                            />
+                          </div>
+                          <strong>{Number(item.translation_count)}</strong>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="support-copy">No usage trend is available yet.</p>
+                    )}
+                  </div>
+                </article>
+              </div>
+            </section>
+          ) : null}
+
           <section className="kpi-grid">
             <article className="metric-card metric-card-pending">
               <div className="metric-card-header">

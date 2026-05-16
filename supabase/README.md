@@ -20,10 +20,12 @@ If you are setting up the SignSpeak architecture from scratch, please execute th
 Deploy the base schema, tables, and permissions:
 1. Execute [`migrations/20260327_signspeak_v1.sql`](./migrations/20260327_signspeak_v1.sql)
 2. Execute [`migrations/20260327_admin_complaints_portal.sql`](./migrations/20260327_admin_complaints_portal.sql) to add complaint portal helper functions.
+3. Execute [`migrations/20260515_organization_accounts.sql`](./migrations/20260515_organization_accounts.sql) to add institute organizations, invite codes, rosters, and analytics.
+4. Execute [`migrations/20260516_lock_down_security_definer_function_grants.sql`](./migrations/20260516_lock_down_security_definer_function_grants.sql) to restrict organization helper functions to signed-in users and service-role contexts.
 
 ### 2. Seed Initial Data
 Populate the database with default dictionary content:
-3. Execute [`seed.sql`](./seed.sql) to load the initial Pakistan Sign Language dictionary references.
+5. Execute [`seed.sql`](./seed.sql) to load the initial Pakistan Sign Language dictionary references.
 
 ### 3. Setup Admin User
 In order to grant access to the Admin Web Portal:

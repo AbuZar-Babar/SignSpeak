@@ -30,7 +30,7 @@ cd SignSpeak
 ### 2. Configure Supabase Backend
 
 1. Create a Supabase project.
-2. Run migrations in order (`20260327_signspeak_v1.sql` -> `20260327_admin_complaints_portal.sql` -> `seed.sql`) from the [`supabase/`](./supabase/) folder.
+2. Run migrations in order (`20260327_signspeak_v1.sql` -> `20260327_admin_complaints_portal.sql` -> `20260515_organization_accounts.sql` -> `20260516_lock_down_security_definer_function_grants.sql` -> `seed.sql`) from the [`supabase/`](./supabase/) folder.
 3. Keep your `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` handy.
 
 ### 3. Run the Admin Portal (React/Vite)
@@ -77,4 +77,3 @@ python -m src.pipelines.inference_pipeline
 - **M. Abdullah Umar**
 
 **Supervisor:** Dr. Rab Nawaz Jadoon
-

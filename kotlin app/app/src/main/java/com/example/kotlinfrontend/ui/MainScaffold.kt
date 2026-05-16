@@ -47,10 +47,10 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.launch
 import com.example.kotlinfrontend.app.AppContainer
+import com.example.kotlinfrontend.ui.account.AccountScreen
 import com.example.kotlinfrontend.ui.components.AppBackground
 import com.example.kotlinfrontend.ui.dictionary.DictionaryScreen
 import com.example.kotlinfrontend.ui.history.HistoryScreen
-import com.example.kotlinfrontend.ui.profile.ProfileScreen
 import com.example.kotlinfrontend.ui.theme.BrandAccent
 import com.example.kotlinfrontend.ui.theme.BrandGlass
 import com.example.kotlinfrontend.ui.theme.BrandInk
@@ -190,11 +190,7 @@ fun MainScaffold(container: AppContainer) {
                         )
                     }
                     composable(ProfileRoute) {
-                        ProfileScreen(
-                            container = container,
-                            onMenuClick = ::openDrawer,
-                            onAvatarClick = { navigateTo(ProfileRoute) }
-                        )
+                        AccountScreen(container = container)
                     }
                 }
             }

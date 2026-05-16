@@ -41,6 +41,8 @@ data class TranslationHistoryItem(
     val id: String,
     @SerialName("user_id")
     val userId: String? = null,
+    @SerialName("organization_id")
+    val organizationId: String? = null,
     @SerialName("predicted_word_slug")
     val predictedWordSlug: String,
     val confidence: Double,
@@ -84,6 +86,8 @@ data class ProfileRecord(
     @SerialName("full_name")
     val fullName: String? = null,
     val role: String = "user",
+    @SerialName("primary_organization_id")
+    val primaryOrganizationId: String? = null,
     @SerialName("created_at")
     val createdAt: String? = null
 )
@@ -92,7 +96,8 @@ data class SessionUser(
     val id: String,
     val email: String?,
     val fullName: String?,
-    val role: String
+    val role: String,
+    val organizationId: String? = null
 )
 
 data class SessionState(

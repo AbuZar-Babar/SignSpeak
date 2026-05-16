@@ -208,6 +208,16 @@ fun AccountScreen(container: AppContainer) {
                             singleLine = true
                         )
 
+                        if (uiState.authMode == AccountAuthMode.REGISTER) {
+                            OutlinedTextField(
+                                value = uiState.inviteCode,
+                                onValueChange = viewModel::updateInviteCode,
+                                modifier = Modifier.fillMaxWidth(),
+                                label = { Text("Institute code (optional)") },
+                                singleLine = true
+                            )
+                        }
+
                         if (uiState.authMode != AccountAuthMode.RESET) {
                             OutlinedTextField(
                                 value = uiState.password,
@@ -264,11 +274,58 @@ fun AccountScreen(container: AppContainer) {
                             text = "Role: ${UiFormatters.prettyWord(uiState.sessionState.user?.role.orEmpty())}",
                             color = Color(0xFF756154)
                         )
+                        Text(
+                            text = if (uiState.sessionState.user?.organizationId.isNullOrBlank()) {
+                                "Institute: Not linked"
+                            } else {
+                                "Institute: Linked"
+                            },
+                            color = Color(0xFF756154)
+                        )
                         TextButton(
                             onClick = viewModel::signOut,
                             enabled = !uiState.isWorking
                         ) {
                             Text(if (uiState.isWorking) "Signing out..." else "Sign Out")
+                        }
+                    }
+                }
+            }
+
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    shape = RoundedCornerShape(24.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            text = "Join an institute",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF3B2B20)
+                        )
+                        Text(
+                            text = "Enter the invite code shared by your school or organization.",
+                            color = Color(0xFF756154)
+                        )
+                        OutlinedTextField(
+                            value = uiState.inviteCode,
+                            onValueChange = viewModel::updateInviteCode,
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Institute invite code") },
+                            singleLine = true
+                        )
+                        TextButton(
+                            onClick = viewModel::joinOrganization,
+                            enabled = !uiState.isWorking && uiState.sessionState.isConfigured
+                        ) {
+                            Text(if (uiState.isWorking) "Joining..." else "Join institute")
                         }
                     }
                 }

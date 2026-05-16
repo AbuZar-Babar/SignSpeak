@@ -23,7 +23,7 @@ data class RootUiState(
         get() = when {
             !isReady -> null
             sessionState.isAuthenticated -> RootDestination.Main
-            hasSeenOnboarding == true -> RootDestination.Auth
+            hasSeenOnboarding == true -> RootDestination.Main
             else -> RootDestination.Onboarding
         }
 }

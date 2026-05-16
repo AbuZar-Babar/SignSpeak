@@ -14,6 +14,7 @@ import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.auth.status.SessionStatus
 import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.postgrest
 import java.time.Instant
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
@@ -45,7 +46,12 @@ class DefaultAuthRepository(
         }
     }
 
-    override suspend fun signUp(email: String, password: String, fullName: String): Result<Unit> = runCatching {
+    override suspend fun signUp(
+        email: String,
+        password: String,
+        fullName: String,
+        inviteCode: String?
+    ): Result<Unit> = runCatching {
         val client = requireClient()
         client.auth.signUpWith(Email) {
             this.email = email
@@ -67,6 +73,9 @@ class DefaultAuthRepository(
                 }
             }
         }
+        if (client.auth.currentUserOrNull() != null && !inviteCode.isNullOrBlank()) {
+            joinOrganization(inviteCode).getOrThrow()
+        }
         Unit
     }
 
@@ -76,6 +85,19 @@ class DefaultAuthRepository(
             this.email = email
             this.password = password
         }
+        Unit
+    }
+
+    override suspend fun joinOrganization(inviteCode: String): Result<Unit> = runCatching {
+        val normalizedCode = inviteCode.trim()
+        require(normalizedCode.isNotBlank()) { "Enter an institute invite code." }
+        requireClient().postgrest.rpc(
+            "join_organization_by_invite_code",
+            buildJsonObject {
+                put("invite_code", normalizedCode)
+            }
+        )
+        refreshAuthenticatedSession()
         Unit
     }
 
@@ -99,33 +121,7 @@ class DefaultAuthRepository(
                     }
 
                     is SessionStatus.Authenticated -> {
-                        val user = client.auth.currentUserOrNull()
-                        val fullNameFromMetadata = user?.userMetadata
-                            ?.get("full_name")
-                            ?.toString()
-                            ?.trim('"')
-                        val profile = try {
-                            client.from("profiles")
-                                .select()
-                                .decodeList<ProfileRecord>()
-                                .firstOrNull()
-                        } catch (_: Exception) {
-                            null
-                        }
-
-                        _sessionState.value = SessionState(
-                            isInitialized = true,
-                            isConfigured = true,
-                            isAuthenticated = user != null,
-                            user = user?.let {
-                                SessionUser(
-                                    id = it.id,
-                                    email = it.email,
-                                    fullName = profile?.fullName ?: fullNameFromMetadata,
-                                    role = profile?.role ?: "user"
-                                )
-                            }
-                        )
+                        refreshAuthenticatedSession()
                     }
 
                     is SessionStatus.NotAuthenticated -> {
@@ -144,6 +140,44 @@ class DefaultAuthRepository(
                 }
             }
         }
+    }
+
+    private suspend fun refreshAuthenticatedSession() {
+        val client = requireClient()
+        val user = client.auth.currentUserOrNull()
+        val fullNameFromMetadata = user?.userMetadata
+            ?.get("full_name")
+            ?.toString()
+            ?.trim('"')
+        val profile = try {
+            user?.let { currentUser ->
+                client.from("profiles")
+                    .select {
+                        filter {
+                            eq("id", currentUser.id)
+                        }
+                    }
+                    .decodeList<ProfileRecord>()
+                    .firstOrNull()
+            }
+        } catch (_: Exception) {
+            null
+        }
+
+        _sessionState.value = SessionState(
+            isInitialized = true,
+            isConfigured = true,
+            isAuthenticated = user != null,
+            user = user?.let {
+                SessionUser(
+                    id = it.id,
+                    email = it.email,
+                    fullName = profile?.fullName ?: fullNameFromMetadata,
+                    role = profile?.role ?: "user",
+                    organizationId = profile?.primaryOrganizationId
+                )
+            }
+        )
     }
 
     private fun requireClient() = supabaseService.clientOrNull
