@@ -47,6 +47,8 @@ htmlcov/
 # Mobile / Build
 node_modules/
 .expo/
+**/.gradle/
+**/.kotlin/
 **/local.properties
 **/build/
 **/dist/
