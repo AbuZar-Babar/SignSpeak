@@ -1274,45 +1274,45 @@ function LoginPage({
   return (
     <section className="auth-stage">
       <article className="auth-card auth-card-wide">
-        <p className="eyebrow">{isSuperLogin ? 'Platform owner access' : 'Institute admin portal'}</p>
+        <p className="eyebrow">{isSuperLogin ? 'SignSpeak Platform' : 'SignSpeak Schools'}</p>
         <h2 className="page-title">
-          {isSuperLogin ? 'Super admin sign in' : 'School admin sign in'}
+          {isSuperLogin ? 'Platform Console' : 'School Admin Console'}
         </h2>
         <p className="support-copy">
           {isSuperLogin
-            ? 'Create school workspaces, issue organization admin access, and review institute activity from one place.'
-            : 'Review student activity, share institute invite codes, and monitor SignSpeak usage for your school.'}
+            ? 'Manage school onboarding, assign organization admins, and monitor institute-level activity.'
+            : 'Track student usage, manage your institute invite code, and review school-specific reports.'}
         </p>
 
         <div className="auth-points">
           <div className="auth-point">
-            <strong>{isSuperLogin ? 'Organization onboarding' : 'Scoped school dashboard'}</strong>
+            <strong>{isSuperLogin ? 'School Onboarding' : 'Institute Scope'}</strong>
             <span>
               {isSuperLogin
-                ? 'Create verified institutes and one-time setup links for school admins.'
-                : 'Only your institute roster, analytics, invite code, and complaints are visible.'}
+                ? 'Create verified school workspaces and issue one-time setup links.'
+                : 'You only see users, analytics, and reports linked to your own school.'}
             </span>
           </div>
           <div className="auth-point">
-            <strong>{isSuperLogin ? 'Platform oversight' : 'Student tracking'}</strong>
+            <strong>{isSuperLogin ? 'Owner-Level Access' : 'Student Join Flow'}</strong>
             <span>
               {isSuperLogin
-                ? 'Use this account only for the SignSpeak owner or development team.'
-                : 'Students join through the mobile app with the invite code you share.'}
+                ? 'Reserved for the product owner and trusted platform operators.'
+                : 'Students join your institute from the app using your active invite code.'}
             </span>
           </div>
         </div>
       </article>
 
       <article className="auth-card">
-        <p className="eyebrow">Secure sign in</p>
+        <p className="eyebrow">{isSuperLogin ? 'Platform Sign In' : 'School Sign In'}</p>
         <h3 className="card-title">
-          {isSuperLogin ? 'Use your owner account' : 'Use your school admin account'}
+          {isSuperLogin ? 'Sign in as Super Admin' : 'Sign in as School Admin'}
         </h3>
 
         <form className="auth-form" onSubmit={(event) => handleLogin(event, loginMode)}>
           <label>
-            Email
+            Work Email
             <div className="field-shell">
               <Icon name="alternate_email" />
               <input
@@ -1334,7 +1334,7 @@ function LoginPage({
                 onClick={handleResetPassword}
                 type="button"
               >
-                Forgot password?
+                Reset password
               </button>
             </span>
             <div className="field-shell">
@@ -1342,7 +1342,7 @@ function LoginPage({
               <input
                 autoComplete="current-password"
                 onChange={(event) => setPassword(event.target.value)}
-                placeholder="Your password"
+                placeholder="Enter password"
                 type={showPassword ? 'text' : 'password'}
                 value={password}
               />
@@ -1358,7 +1358,7 @@ function LoginPage({
           </label>
 
           <button className="primary-button" disabled={authBusy} type="submit">
-            <span>{authBusy ? 'Signing in...' : 'Sign in'}</span>
+            <span>{authBusy ? 'Signing in...' : isSuperLogin ? 'Open Platform Console' : 'Open School Console'}</span>
             <Icon name="login" />
           </button>
         </form>
@@ -1368,7 +1368,7 @@ function LoginPage({
 
         {isSuperLogin ? (
           <button className="text-link auth-footer-link" onClick={() => navigate('org-login')} type="button">
-            Back to organization admin login
+            Switch to school admin login
           </button>
         ) : (
           <>
@@ -1377,7 +1377,7 @@ function LoginPage({
               onClick={() => navigate('request-account')}
               type="button"
             >
-              <span>Request an institute account</span>
+              <span>Request School Admin Account</span>
               <Icon name="contact_support" />
             </button>
             <button
@@ -1385,7 +1385,7 @@ function LoginPage({
               onClick={() => navigate('super-admin')}
               type="button"
             >
-              Super admin login
+              Super Admin Login
             </button>
           </>
         )}
@@ -1398,28 +1398,28 @@ function RequestAccountPage({ navigate }: { navigate: (route: PortalRoute) => vo
   return (
     <section className="auth-stage">
       <article className="auth-card auth-card-wide">
-        <p className="eyebrow">Institute onboarding</p>
-        <h2 className="page-title">Request a SignSpeak school account</h2>
+        <p className="eyebrow">School Onboarding</p>
+        <h2 className="page-title">Request a School Admin Account</h2>
         <p className="support-copy">
-          SignSpeak school accounts are created manually after the institute contact is verified.
-          Share your school name, city, contact person, and preferred admin email.
+          School accounts are created after manual verification. Share your school name, city,
+          contact person, and preferred admin email to begin onboarding.
         </p>
 
         <div className="auth-points">
           <div className="auth-point">
-            <strong>What you receive</strong>
-            <span>A school admin account, a password setup link, and a student invite code.</span>
+            <strong>What You Receive</strong>
+            <span>A school admin login, a password setup link, and a student invite code.</span>
           </div>
           <div className="auth-point">
-            <strong>Student access</strong>
-            <span>Public app usage stays open; only tracked school progress needs login.</span>
+            <strong>Student Access</strong>
+            <span>Public app usage stays open; only school-tracked progress requires login.</span>
           </div>
         </div>
       </article>
 
       <article className="auth-card">
-        <p className="eyebrow">Contact the SignSpeak owner</p>
-        <h3 className="card-title">Account request channels</h3>
+        <p className="eyebrow">Contact Channels</p>
+        <h3 className="card-title">Contact SignSpeak Owner</h3>
 
         <div className="contact-list">
           <ContactLink icon="mail" href={contactConfig.email ? `mailto:${contactConfig.email}` : null} label="Email" value={contactConfig.email} />
@@ -1429,13 +1429,13 @@ function RequestAccountPage({ navigate }: { navigate: (route: PortalRoute) => vo
 
         {!contactConfig.email && !contactConfig.phone && !contactConfig.whatsappUrl ? (
           <p className="inline-feedback inline-feedback-error">
-            Contact details are not configured yet. Add the Vite contact environment variables.
+            Contact details are not configured yet. Set the Vite contact environment variables.
           </p>
         ) : null}
 
         <button className="secondary-button" onClick={() => navigate('org-login')} type="button">
           <Icon name="arrow_back" />
-          <span>Back to login</span>
+          <span>Back to School Login</span>
         </button>
       </article>
     </section>
@@ -1478,14 +1478,14 @@ function SetupLinkWaitingPage({ navigate }: { navigate: (route: PortalRoute) => 
   return (
     <section className="auth-stage auth-stage-single">
       <article className="auth-card auth-card-wide">
-        <p className="eyebrow">Password setup</p>
-        <h2 className="page-title">Open the latest setup link from your email.</h2>
+        <p className="eyebrow">Password Setup</p>
+        <h2 className="page-title">Open the Latest Setup Link from Email</h2>
         <p className="support-copy">
-          If the setup link has expired, ask the SignSpeak owner to send a new one or use the
-          password reset option on the login screen.
+          If the link expired, request a new setup link from the SignSpeak owner or use password
+          reset on the login form.
         </p>
         <button className="secondary-button" onClick={() => navigate('org-login')} type="button">
-          Back to organization login
+          Back to School Login
         </button>
       </article>
     </section>
@@ -1531,10 +1531,10 @@ function PasswordSetupPage({
 
       <section className="auth-stage auth-stage-single">
         <article className="auth-card">
-          <p className="eyebrow">Account setup</p>
-          <h2 className="page-title page-title-small">Set your admin password</h2>
+          <p className="eyebrow">Account Setup</p>
+          <h2 className="page-title page-title-small">Set Admin Password</h2>
           <p className="support-copy">
-            This password will be used for future organization admin sign-ins.
+            This password will be used for future school admin sign-ins.
           </p>
 
           <form className="auth-form" onSubmit={onSubmit}>
