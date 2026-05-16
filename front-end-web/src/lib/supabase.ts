@@ -7,7 +7,7 @@ export const supabaseConfigError = !url || !key
   ? 'Missing VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY.'
   : null;
 
-export const supabase = !supabaseConfigError
+export const supabase = url && key && !supabaseConfigError
   ? createClient(url, key, {
       auth: {
         autoRefreshToken: true,

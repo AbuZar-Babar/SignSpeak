@@ -1,10 +1,13 @@
 # SignSpeak Admin Portal
 
-A fully-featured React + Vite admin portal designed for managing, reviewing, and resolving user complaints submitted from the SignSpeak mobile app. It provides a secure workspace for administrators to ensure translation quality and moderate dictionary feedback.
+A React + Vite admin portal for SignSpeak school onboarding, organization analytics, and complaint review. The default entry is for organization admins, with a separate super admin login link for the app owner.
 
 ## Features
 
-- **Secure Admin Login:** Role-based access control ensuring only authorized personnel have access.
+- **Two Admin Views:** Super admins manage schools and org admin accounts; organization admins see only their own institute workspace.
+- **Institute Account Requests:** Public request page shows configured contact channels for schools that need an account.
+- **Secure Admin Login:** Role-based access control through Supabase profiles and organization memberships.
+- **Student Invite Codes:** Organization admins can share and rotate invite codes used by students in the mobile app.
 - **Complaint Queue:** A streamlined dashboard with seamless filtering and search capabilities.
 - **Complaint Detail Workspace:** Deep-dive into specific complaints, complete with prediction data and reporter context.
 - **Status Management:** Track issue lifecycle across states (`open`, `reviewing`, `resolved`, `rejected`).
@@ -31,7 +34,12 @@ Provide your Supabase credentials in the `.env` file:
 ```env
 VITE_SUPABASE_URL=your_supabase_url
 VITE_SUPABASE_PUBLISHABLE_KEY=your_publishable_key
+VITE_ORG_CONTACT_EMAIL=you@example.com
+VITE_ORG_CONTACT_PHONE=+92XXXXXXXXXX
+VITE_ORG_CONTACT_WHATSAPP_URL=https://wa.me/92XXXXXXXXXX
 ```
+
+The contact values power the public institute request page. Leave a value blank if you do not want that contact channel shown.
 
 ### 2. Install and Run
 
@@ -57,12 +65,23 @@ This portal relies on the shared Supabase backend to interact with the broader S
 1. Ensure the necessary SQL migrations are executed on your Supabase project (from the `supabase/` root directory):
    - `20260327_signspeak_v1.sql`
    - `20260327_admin_complaints_portal.sql`
+   - `20260515_organization_accounts.sql`
+   - `20260516_lock_down_security_definer_function_grants.sql`
+   - `20260517_platform_org_admin_creation.sql`
+   - `20260517_restrict_legacy_organization_creation.sql`
    - `seed.sql`
 
-2. **Granting Admin Access:**
+2. Deploy the Edge Function used by the super admin account creation flow:
+
+   ```bash
+   supabase functions deploy admin-create-org-admin
+   ```
+
+3. **Granting Super Admin Access:**
    - Create a user in your Supabase Auth dashboard (or register a general user via the mobile app).
    - Promote that user by setting `public.profiles.role = 'admin'`.
-   - Log into the portal with that account.
+   - Log in through the small **Super admin login** link at the bottom of the organization login page.
+   - Use the super admin view to create verified institutes, organization admin setup links, and student invite codes.
 
 ## Deployment Guidelines (e.g., Render)
 
@@ -70,4 +89,4 @@ The portal is a standard static Vite app. A typical Render static-site setup req
 
 - **Build Command:** `cd front-end-web && npm ci && npm run build`
 - **Publish Directory:** `front-end-web/dist`
-- **Required Environment Variables:** `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`
+- **Required Environment Variables:** `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, and any `VITE_ORG_CONTACT_*` values you want displayed on the request page.

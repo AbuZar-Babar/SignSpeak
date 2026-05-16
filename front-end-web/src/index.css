@@ -160,7 +160,7 @@ code {
   color: var(--primary);
   font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.18em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -180,7 +180,7 @@ code {
   margin: 0.35rem 0 0;
   font-size: clamp(2rem, 4vw, 3.4rem);
   line-height: 0.96;
-  letter-spacing: -0.04em;
+  letter-spacing: 0;
 }
 
 .page-title-small {
@@ -308,6 +308,11 @@ code {
   align-items: center;
 }
 
+.auth-stage-single {
+  grid-template-columns: minmax(0, 760px);
+  justify-content: center;
+}
+
 .auth-card {
   position: relative;
   border-radius: var(--radius-lg);
@@ -414,6 +419,59 @@ code {
 .text-link:disabled {
   opacity: 0.65;
   cursor: wait;
+}
+
+.auth-footer-link {
+  justify-self: center;
+  margin-top: 0.5rem;
+}
+
+.auth-request-button {
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+.contact-list {
+  display: grid;
+  gap: 0.8rem;
+  margin: 1rem 0;
+}
+
+.contact-link {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 1rem;
+  border-radius: 1rem;
+  background: var(--surface-low);
+  border: 1px solid var(--outline);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.contact-link:hover {
+  background: var(--surface-mid);
+}
+
+.contact-link-disabled {
+  color: var(--muted);
+}
+
+.contact-link strong,
+.contact-link em {
+  display: block;
+}
+
+.contact-link strong {
+  font-size: 0.88rem;
+}
+
+.contact-link em {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-style: normal;
+  overflow-wrap: anywhere;
 }
 
 .field-shell,
@@ -557,7 +615,7 @@ code {
   color: var(--muted);
   font-size: 0.68rem;
   font-weight: 700;
-  letter-spacing: 0.18em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -753,7 +811,7 @@ code {
   color: var(--muted);
   font-size: 0.7rem;
   font-weight: 700;
-  letter-spacing: 0.05em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -875,7 +933,7 @@ code {
   font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
 }
 
 .queue-list {
@@ -921,7 +979,7 @@ code {
   background: var(--primary-soft);
   color: var(--primary);
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
 }
 
 .queue-item h4 {
@@ -1061,7 +1119,7 @@ code {
   font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
 }
 
 .visual-chip-row {
@@ -1113,6 +1171,12 @@ code {
   gap: 0.8rem;
 }
 
+.visual-copy h3 {
+  margin: 0;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.45rem;
+}
+
 .visual-copy blockquote {
   margin: 0;
   padding: 1rem 1.1rem;
@@ -1147,7 +1211,7 @@ code {
   font-size: 0.78rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
 }
 
 .insight-card strong {
@@ -1184,7 +1248,7 @@ code {
   font-size: 0.74rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
 }
 
 .context-card dd,
@@ -1368,19 +1432,64 @@ code {
   font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
 }
 
 .invite-card strong {
   font-family: 'Space Grotesk', sans-serif;
   font-size: 1.15rem;
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
 }
 
 .organization-form {
   grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
   gap: 0.8rem;
   align-items: end;
+}
+
+.organization-form-admin {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.setup-result {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+  border-radius: 1rem;
+  background: var(--surface-low);
+  border: 1px solid var(--outline);
+}
+
+.setup-result h4,
+.setup-result p {
+  margin: 0;
+}
+
+.setup-result h4 {
+  margin-top: 0.25rem;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.2rem;
+}
+
+.setup-result textarea {
+  min-height: 5.5rem;
+  resize: vertical;
+  padding: 0.9rem 1rem;
+  border-radius: 1rem;
+  background: var(--card-strong);
+  border: 1px solid var(--outline);
+}
+
+.organization-directory-row {
+  width: 100%;
+  border: 1px solid transparent;
+  color: var(--text);
+  text-align: left;
+}
+
+.organization-directory-row:hover {
+  border-color: color-mix(in srgb, var(--primary) 24%, transparent);
+  background: var(--card-strong);
 }
 
 .organization-dashboard {
