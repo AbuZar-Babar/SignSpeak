@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -11,6 +13,13 @@ val supabasePublishableKey = providers.gradleProperty("SUPABASE_PUBLISHABLE_KEY"
 val geminiApiKey = providers.gradleProperty("GEMINI_API_KEY")
     .orElse(System.getenv("GEMINI_API_KEY") ?: "")
 
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties()
+val hasKeystoreProperties = keystorePropertiesFile.exists()
+if (hasKeystoreProperties) {
+    keystoreProperties.load(keystorePropertiesFile.inputStream())
+}
+
 android {
     namespace = "com.example.kotlinfrontend"
     compileSdk {
@@ -20,10 +29,10 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.kotlinfrontend"
+        applicationId = "com.signspeak.abuzar"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
+        versionCode = 2
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -38,9 +47,26 @@ android {
         buildConfigField("String", "GEMINI_API_KEY", "\"${geminiApiKey.get()}\"")
     }
 
+    signingConfigs {
+        create("release") {
+            if (hasKeystoreProperties) {
+                val storeFilePath = keystoreProperties.getProperty("storeFile")
+                check(!storeFilePath.isNullOrBlank()) {
+                    "Missing 'storeFile' in keystore.properties"
+                }
+                storeFile = rootProject.file(storeFilePath)
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
     buildTypes {
         release {
             isMinifyEnabled = false
+            if (hasKeystoreProperties) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

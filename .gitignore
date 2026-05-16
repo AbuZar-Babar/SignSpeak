@@ -53,6 +53,9 @@ node_modules/
 **/build/
 **/dist/
 *.apk
+**/keystore.properties
+**/*.jks
+**/*.keystore
 
 # Jupyter
 .ipynb_checkpoints
