@@ -1,9 +1,14 @@
 package com.example.kotlinfrontend
 
 import android.util.Log
-import com.google.ai.client.generativeai.GenerativeModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
+import java.io.IOException
 
 enum class SentenceLanguage(val displayName: String) {
     URDU("اردو"),
@@ -15,27 +20,21 @@ data class SentenceResult(
     val rawWords: List<String>,
     val formedSentence: String,
     val language: SentenceLanguage,
-    val isError: Boolean = false
+    val isError: Boolean = false,
+    val errorMessage: String? = null
 )
 
 class GeminiSentenceFormer(apiKey: String) {
 
     private val normalizedApiKey = apiKey.trim()
-    private val model: GenerativeModel? by lazy(LazyThreadSafetyMode.NONE) {
-        if (normalizedApiKey.isBlank()) {
-            null
-        } else {
-            try {
-                GenerativeModel(
-                    modelName = "gemini-2.0-flash",
-                    apiKey = normalizedApiKey
-                )
-            } catch (error: Throwable) {
-                Log.e("GeminiSentenceFormer", "Failed to initialize Gemini model", error)
-                null
-            }
-        }
+    private val apiKeyDiagnostic = if (normalizedApiKey.isBlank()) {
+        "length=0"
+    } else {
+        "length=${normalizedApiKey.length}, prefix=${normalizedApiKey.take(6)}"
     }
+    private val client = OkHttpClient()
+    private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
+    private val modelName = "gemini-2.5-flash-lite"
 
     suspend fun formSentence(
         words: List<String>,
@@ -95,28 +94,28 @@ class GeminiSentenceFormer(apiKey: String) {
             $languageInstruction
         """.trimIndent()
 
-        val activeModel = model
-        if (activeModel == null) {
+        if (normalizedApiKey.isBlank()) {
             return SentenceResult(
                 rawWords = cleanedWords,
                 formedSentence = cleanedWords.joinToString(" "),
                 language = language,
-                isError = true
+                isError = true,
+                errorMessage = "Gemini API key is missing in this build ($apiKeyDiagnostic)."
             )
         }
 
         return try {
-            val response = withContext(Dispatchers.IO) {
-                activeModel.generateContent(prompt)
-            }
-            val text = response.text?.trim().orEmpty()
+            val text = withContext(Dispatchers.IO) {
+                generateContent(prompt)
+            }.trim()
 
             if (text.isBlank()) {
                 SentenceResult(
                     rawWords = cleanedWords,
                     formedSentence = cleanedWords.joinToString(" "),
                     language = language,
-                    isError = true
+                    isError = true,
+                    errorMessage = "Gemini returned an empty response."
                 )
             } else {
                 SentenceResult(
@@ -131,8 +130,65 @@ class GeminiSentenceFormer(apiKey: String) {
                 rawWords = cleanedWords,
                 formedSentence = cleanedWords.joinToString(" "),
                 language = language,
-                isError = true
+                isError = true,
+                errorMessage = "${e::class.java.simpleName}: ${e.message.orEmpty()}"
             )
         }
+    }
+
+    private fun generateContent(prompt: String): String {
+        val endpoint = "https://generativelanguage.googleapis.com/v1beta/models/" +
+            "$modelName:generateContent?key=$normalizedApiKey"
+        val payload = JSONObject()
+            .put(
+                "contents",
+                org.json.JSONArray()
+                    .put(
+                        JSONObject()
+                            .put(
+                                "parts",
+                                org.json.JSONArray()
+                                    .put(JSONObject().put("text", prompt))
+                            )
+                    )
+            )
+            .put(
+                "generationConfig",
+                JSONObject()
+                    .put("temperature", 0.2)
+                    .put("maxOutputTokens", 120)
+            )
+            .toString()
+
+        val request = Request.Builder()
+            .url(endpoint)
+            .post(payload.toRequestBody(jsonMediaType))
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            val body = response.body.string()
+            if (!response.isSuccessful) {
+                throw IOException("Gemini HTTP ${response.code}: ${extractErrorMessage(body)}")
+            }
+
+            return JSONObject(body)
+                .optJSONArray("candidates")
+                ?.optJSONObject(0)
+                ?.optJSONObject("content")
+                ?.optJSONArray("parts")
+                ?.optJSONObject(0)
+                ?.optString("text")
+                .orEmpty()
+        }
+    }
+
+    private fun extractErrorMessage(body: String): String {
+        return runCatching {
+            JSONObject(body)
+                .optJSONObject("error")
+                ?.optString("message")
+                ?.takeIf { it.isNotBlank() }
+                ?: body.take(240)
+        }.getOrDefault(body.take(240))
     }
 }
