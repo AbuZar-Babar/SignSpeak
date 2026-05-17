@@ -104,7 +104,6 @@ dependencies {
     implementation(libs.mediapipe.tasks.vision)
     implementation(libs.okhttp)
     implementation(libs.tensorflow.lite)
-    implementation(libs.google.generativeai)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)

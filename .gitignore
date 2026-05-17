@@ -50,6 +50,7 @@ node_modules/
 **/.gradle/
 **/.kotlin/
 **/local.properties
+kotlin app/gradle.properties
 **/build/
 **/dist/
 *.apk
@@ -69,5 +70,5 @@ ml-pipeline/.pytest_cache/
 # Documentation
 SDD/
 SRS/
-
+graphify-out/
 .obsidian

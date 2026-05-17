@@ -3,6 +3,7 @@ package com.example.kotlinfrontend
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.util.Log
 import android.util.Size
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -238,9 +239,21 @@ fun LiveCameraScreen(
     var formedSentence by remember { mutableStateOf("") }
     var isSentenceLoading by remember { mutableStateOf(false) }
     var sentenceError by remember { mutableStateOf(false) }
+    var sentenceErrorMessage by remember { mutableStateOf<String?>(null) }
     val sentenceWordThreshold = 3
     var sentenceDebounceJob by remember { mutableStateOf<Job?>(null) }
-    val geminiSentenceFormer: GeminiSentenceFormer? = null
+    val geminiSentenceFormer = remember {
+        GeminiSentenceFormer(BuildConfig.GEMINI_API_KEY)
+    }
+    var sentenceRequestVersion by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(Unit) {
+        val key = BuildConfig.GEMINI_API_KEY.trim()
+        Log.d(
+            "GeminiSentenceFormer",
+            "Runtime Gemini key diagnostic: length=${key.length}, prefix=${key.take(6)}"
+        )
+    }
 
     // Sync torch whenever torchEnabled changes
     LaunchedEffect(torchEnabled) {
@@ -255,7 +268,6 @@ fun LiveCameraScreen(
         if (productMode) {
             inferenceMode = InferenceMode.ON_DEVICE
             selectedModel = SignModel.BASELINE
-            sentenceModeEnabled = false
         }
     }
 
@@ -507,25 +519,28 @@ fun LiveCameraScreen(
                                     }
 
                                     // ── Trigger Gemini sentence formation ────
-                                    if (sentenceModeEnabled &&
-                                        geminiSentenceFormer != null &&
-                                        liveState.commitCount >= sentenceWordThreshold
-                                    ) {
+                                    if (sentenceModeEnabled && liveState.commitCount >= sentenceWordThreshold) {
                                         val currentWords = liveState.transcript
                                             .split(" ")
                                             .filter { it.isNotBlank() }
+                                        val requestVersion = ++sentenceRequestVersion
                                         sentenceDebounceJob?.cancel()
                                         sentenceDebounceJob = coroutineScope.launch {
                                             delay(800L)
                                             isSentenceLoading = true
                                             sentenceError = false
+
                                             val result = geminiSentenceFormer.formSentence(
                                                 words = currentWords,
                                                 language = sentenceLanguage
                                             )
-                                            formedSentence = result.formedSentence
-                                            sentenceError = result.isError
-                                            isSentenceLoading = false
+
+                                            if (requestVersion == sentenceRequestVersion) {
+                                                formedSentence = result.formedSentence
+                                                sentenceError = result.isError
+                                                sentenceErrorMessage = result.errorMessage
+                                                isSentenceLoading = false
+                                            }
                                         }
                                     }
                                 }
@@ -664,10 +679,9 @@ fun LiveCameraScreen(
         if (savedBackendUrl.isNotBlank()) {
             refreshBackendHealth(updateStatusText = false)
         }
-        sentenceModeEnabled = false
+        sentenceModeEnabled = backendSettingsRepository.sentenceModeEnabledFlow.first()
         // Restore previously chosen output language (persisted across sessions)
         sentenceLanguage = backendSettingsRepository.sentenceLanguageFlow.first()
-        backendSettingsRepository.saveSentenceModeEnabled(false)
     }
 
     LaunchedEffect(hasPermission, inferenceMode, selectedModel, performanceMode, useQuantizedModel, activeBackendUrl, useFrontCamera) {
@@ -755,6 +769,35 @@ fun LiveCameraScreen(
                                 backendSettingsRepository.saveSentenceLanguage(SentenceLanguage.BOTH)
                             }
                         }
+                    )
+                }
+
+                SettingsSectionLabel("Smart Sentences")
+                SettingsToggleRow(
+                    label = "AI Sentence Formation",
+                    description = "Use Gemini AI to form natural sentences from detected words",
+                    checked = sentenceModeEnabled,
+                    onCheckedChange = { enabled ->
+                        sentenceModeEnabled = enabled
+                        coroutineScope.launch {
+                            backendSettingsRepository.saveSentenceModeEnabled(enabled)
+                        }
+                        if (!enabled) {
+                            formedSentence = ""
+                            isSentenceLoading = false
+                            sentenceDebounceJob?.cancel()
+                        }
+                    }
+                )
+                AnimatedVisibility(
+                    visible = sentenceModeEnabled,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
+                    Text(
+                        text = "When enabled, SignSpeak forms a sentence after at least $sentenceWordThreshold detected words.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFF6B7280)
                     )
                 }
 
@@ -1032,6 +1075,7 @@ fun LiveCameraScreen(
                                             transcript = ""
                                             formedSentence = ""
                                             sentenceError = false
+                                            sentenceErrorMessage = null
                                             isSentenceLoading = false
                                             sentenceDebounceJob?.cancel()
                                             lastObservedCommitCount = 0
@@ -1111,6 +1155,15 @@ fun LiveCameraScreen(
                                             maxLines = 3,
                                             overflow = TextOverflow.Ellipsis
                                         )
+                                        if (sentenceError) {
+                                            Text(
+                                                text = sentenceErrorMessage ?: "Gemini request failed.",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = Color(0xFFFFC4C4),
+                                                maxLines = 6,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -1267,10 +1320,12 @@ fun LiveCameraScreen(
                                     backendSettingsRepository.saveSentenceModeEnabled(enabled)
                                 }
                                 if (!enabled) {
-                                    formedSentence = ""
-                                    isSentenceLoading = false
-                                    sentenceDebounceJob?.cancel()
-                                }
+                            formedSentence = ""
+                            isSentenceLoading = false
+                            sentenceError = false
+                            sentenceErrorMessage = null
+                            sentenceDebounceJob?.cancel()
+                        }
                             }
                         )
                         AnimatedVisibility(
@@ -1301,11 +1356,12 @@ fun LiveCameraScreen(
                                                     backendSettingsRepository.saveSentenceLanguage(lang)
                                                 }
                                                 // Re-trigger sentence with new language if we have words
-                                                if (formedSentence.isNotBlank() && geminiSentenceFormer != null) {
+                                                if (formedSentence.isNotBlank()) {
                                                     val currentWords = transcript
                                                         .split(" ")
                                                         .filter { it.isNotBlank() }
                                                     if (currentWords.size >= sentenceWordThreshold) {
+                                                        val requestVersion = ++sentenceRequestVersion
                                                         sentenceDebounceJob?.cancel()
                                                         sentenceDebounceJob = coroutineScope.launch {
                                                             isSentenceLoading = true
@@ -1314,22 +1370,18 @@ fun LiveCameraScreen(
                                                                 words = currentWords,
                                                                 language = lang
                                                             )
-                                                            formedSentence = result.formedSentence
-                                                            sentenceError = result.isError
-                                                            isSentenceLoading = false
+                                                            if (requestVersion == sentenceRequestVersion) {
+                                                                formedSentence = result.formedSentence
+                                                                sentenceError = result.isError
+                                                                sentenceErrorMessage = result.errorMessage
+                                                                isSentenceLoading = false
+                                                            }
                                                         }
                                                     }
                                                 }
                                             }
                                         )
                                     }
-                                }
-                                if (geminiSentenceFormer == null) {
-                                    Text(
-                                        text = "Gemini AI unavailable on this build. Check API key and dependency setup.",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = Color(0xFFB91C1C)
-                                    )
                                 }
                             }
                         }
