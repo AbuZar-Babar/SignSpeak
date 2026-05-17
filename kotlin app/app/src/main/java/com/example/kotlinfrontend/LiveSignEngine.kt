@@ -6,6 +6,7 @@ import kotlin.math.max
 
 data class LiveInferenceState(
     val rawPrediction: PredictionResult?,
+    val faceEmotion: FaceEmotionResult?,
     val displayedLabel: String,
     val displayedConfidence: Float,
     val stability: Float,
@@ -36,25 +37,34 @@ class LiveSignEngine(
         model = model,
         useQuantizedModel = useQuantizedModel
     )
+    private val faceClassifier = TfliteFaceEmotionClassifier(
+        context = context,
+        useQuantizedModel = useQuantizedModel
+    )
     private val frameBuffer = ArrayDeque<FloatArray>(classifier.sequenceLength)
     private val accumulator = PredictionAccumulator(smoothingWindowSize)
 
     private var lastInferenceTimestampMs = -1L
+    private var lastFaceInferenceTimestampMs = -1L
     private var lastFrameTimestampNs = -1L
     private var smoothedFps = 0f
     private var latestPrediction: PredictionResult? = null
+    private var latestFaceEmotion: FaceEmotionResult? = null
 
     @Synchronized
     override fun warmUp() {
         val zeros = List(classifier.sequenceLength) { FloatArray(126) }
         classifier.predict(zeros)
+        faceClassifier.predict(FloatArray(48 * 48))
     }
 
     @Synchronized
     override fun resetCapture(clearTranscript: Boolean) {
         frameBuffer.clear()
         latestPrediction = null
+        latestFaceEmotion = null
         lastInferenceTimestampMs = -1L
+        lastFaceInferenceTimestampMs = -1L
         accumulator.reset(clearTranscript = clearTranscript)
     }
 
@@ -71,7 +81,8 @@ class LiveSignEngine(
             imageProxy = imageProxy,
             timestampMs = timestampMs,
             includeOverlay = includeOverlay,
-            includeFace = includeFace
+            includeFace = includeFace,
+            includeFaceInput = true
         )
         val frameVector = extraction.vector
         updateFps(timestampNs)
@@ -91,10 +102,18 @@ class LiveSignEngine(
             accumulator.applyPrediction(latestPrediction!!, timestampMs)
         }
 
+        val shouldInferFace = extraction.faceInput != null &&
+            (lastFaceInferenceTimestampMs < 0L || (timestampMs - lastFaceInferenceTimestampMs) >= minInferenceGapMs)
+        if (shouldInferFace) {
+            latestFaceEmotion = faceClassifier.predict(extraction.faceInput)
+            lastFaceInferenceTimestampMs = timestampMs
+        }
+
         val displayState = accumulator.snapshot()
 
         return LiveInferenceState(
             rawPrediction = latestPrediction,
+            faceEmotion = latestFaceEmotion,
             displayedLabel = displayState.label,
             displayedConfidence = displayState.confidence,
             stability = displayState.stability,
@@ -160,5 +179,6 @@ class LiveSignEngine(
     override fun close() {
         handExtractor.close()
         classifier.close()
+        faceClassifier.close()
     }
 }

@@ -211,6 +211,8 @@ fun LiveCameraScreen(
     var statusText by remember { mutableStateOf("Initializing live camera...") }
     var predictedText by remember { mutableStateOf("--") }
     var confidence by remember { mutableFloatStateOf(0f) }
+    var faceEmotionText by remember { mutableStateOf("--") }
+    var faceEmotionConfidence by remember { mutableFloatStateOf(0f) }
     var stability by remember { mutableFloatStateOf(0f) }
     var transcript by remember { mutableStateOf("") }
     var overlayHands by remember { mutableStateOf<List<HandWireframe>>(emptyList()) }
@@ -342,6 +344,8 @@ fun LiveCameraScreen(
         isRecording = false
         recordingGate.set(false)
         lastProcessedFrameNs.set(0L)
+        faceEmotionText = "--"
+        faceEmotionConfidence = 0f
         overlayHands = emptyList()
         overlayFace = null
         roundTripMs = null
@@ -365,6 +369,8 @@ fun LiveCameraScreen(
         liveEngineRef.get()?.resetCapture(clearTranscript = false)
         predictedText = "--"
         confidence = 0f
+        faceEmotionText = "--"
+        faceEmotionConfidence = 0f
         stability = 0f
         inferenceMs = 0L
         roundTripMs = null
@@ -422,6 +428,8 @@ fun LiveCameraScreen(
         }
         predictedText = "--"
         confidence = 0f
+        faceEmotionText = "--"
+        faceEmotionConfidence = 0f
         stability = 0f
         inferenceMs = 0L
         roundTripMs = null
@@ -498,6 +506,8 @@ fun LiveCameraScreen(
                                 fps = liveState.fps
                                 predictedText = liveState.displayedLabel
                                 confidence = liveState.displayedConfidence.coerceIn(0f, 1f)
+                                faceEmotionText = liveState.faceEmotion?.label ?: "--"
+                                faceEmotionConfidence = liveState.faceEmotion?.confidence?.coerceIn(0f, 1f) ?: 0f
                                 stability = liveState.stability.coerceIn(0f, 1f)
                                 transcript = liveState.transcript
                                 overlayHands = liveState.overlayHands
@@ -1050,6 +1060,35 @@ fun LiveCameraScreen(
                                     .clip(RoundedCornerShape(10.dp)),
                                 color = Color(0xFF58CC02),
                                 trackColor = Color(0x3358CC02)
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = if (faceEmotionText == "--") {
+                                    "Face emotion: detecting"
+                                } else {
+                                    "Face emotion: ${faceEmotionText.replaceFirstChar { it.uppercase() }}"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFFE2F7D7),
+                                modifier = Modifier.weight(1f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = if (faceEmotionConfidence > 0f) {
+                                    "${(faceEmotionConfidence * 100f).roundToInt()}%"
+                                } else {
+                                    ""
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(0xFFE2F7D7)
                             )
                         }
 
