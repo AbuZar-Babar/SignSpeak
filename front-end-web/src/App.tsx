@@ -1272,45 +1272,13 @@ function LoginPage({
   const isSuperLogin = loginMode === 'super';
 
   return (
-    <section className="auth-stage">
-      <article className="auth-card auth-card-wide">
-        <p className="eyebrow">{isSuperLogin ? 'SignSpeak Platform' : 'SignSpeak Schools'}</p>
-        <h2 className="page-title">
-          {isSuperLogin ? 'Platform Console' : 'School Admin Console'}
-        </h2>
-        <p className="support-copy">
-          {isSuperLogin
-            ? 'Manage school onboarding, assign organization admins, and monitor institute-level activity.'
-            : 'Track student usage, manage your institute invite code, and review school-specific reports.'}
-        </p>
-
-        <div className="auth-points">
-          <div className="auth-point">
-            <strong>{isSuperLogin ? 'School Onboarding' : 'Institute Scope'}</strong>
-            <span>
-              {isSuperLogin
-                ? 'Create verified school workspaces and issue one-time setup links.'
-                : 'You only see users, analytics, and reports linked to your own school.'}
-            </span>
-          </div>
-          <div className="auth-point">
-            <strong>{isSuperLogin ? 'Owner-Level Access' : 'Student Join Flow'}</strong>
-            <span>
-              {isSuperLogin
-                ? 'Reserved for the product owner and trusted platform operators.'
-                : 'Students join your institute from the app using your active invite code.'}
-            </span>
-          </div>
-        </div>
-      </article>
-
-      <article className="auth-card">
-        <p className="eyebrow">{isSuperLogin ? 'Platform Sign In' : 'School Sign In'}</p>
-        <h3 className="card-title">
-          {isSuperLogin ? 'Sign in as Super Admin' : 'Sign in as School Admin'}
-        </h3>
-
-        <form className="auth-form" onSubmit={(event) => handleLogin(event, loginMode)}>
+    <section className="auth-stage auth-stage-login">
+      <article
+        aria-label={isSuperLogin ? 'Super admin sign in' : 'School admin sign in'}
+        className="auth-login-shell"
+      >
+        <section className="auth-login-pane">
+          <form className="auth-form auth-form-login" onSubmit={(event) => handleLogin(event, loginMode)}>
           <label>
             Work Email
             <div className="field-shell">
@@ -1361,34 +1329,45 @@ function LoginPage({
             <span>{authBusy ? 'Signing in...' : isSuperLogin ? 'Open Platform Console' : 'Open School Console'}</span>
             <Icon name="login" />
           </button>
-        </form>
+          </form>
 
-        {authError ? <p className="inline-feedback inline-feedback-error">{authError}</p> : null}
-        {authNotice ? <p className="inline-feedback inline-feedback-success">{authNotice}</p> : null}
+          {authError ? <p className="inline-feedback inline-feedback-error">{authError}</p> : null}
+          {authNotice ? <p className="inline-feedback inline-feedback-success">{authNotice}</p> : null}
 
-        {isSuperLogin ? (
-          <button className="text-link auth-footer-link" onClick={() => navigate('org-login')} type="button">
-            Switch to school admin login
-          </button>
-        ) : (
-          <>
-            <button
-              className="secondary-button auth-request-button"
-              onClick={() => navigate('request-account')}
-              type="button"
-            >
-              <span>Request School Admin Account</span>
-              <Icon name="contact_support" />
+          {isSuperLogin ? (
+            <button className="text-link auth-footer-link" onClick={() => navigate('org-login')} type="button">
+              Switch to school admin login
             </button>
-            <button
-              className="text-link auth-footer-link"
-              onClick={() => navigate('super-admin')}
-              type="button"
-            >
-              Super Admin Login
-            </button>
-          </>
-        )}
+          ) : (
+            <>
+              <button
+                className="secondary-button auth-request-button"
+                onClick={() => navigate('request-account')}
+                type="button"
+              >
+                <span>Request Institution Account</span>
+                <Icon name="contact_support" />
+              </button>
+              <button
+                className="text-link auth-footer-link"
+                onClick={() => navigate('super-admin')}
+                type="button"
+              >
+                Super Admin Login
+              </button>
+            </>
+          )}
+        </section>
+
+        <section className="auth-promo-pane">
+          <div className="auth-promo-description">
+            <span>School console</span>
+            <p>Manage invite codes, student usage, and complaint reviews from one SignSpeak workspace.</p>
+          </div>
+          <div className="auth-promo-ring" aria-hidden="true">
+            <div className="auth-promo-core" />
+          </div>
+        </section>
       </article>
     </section>
   );
@@ -1396,47 +1375,34 @@ function LoginPage({
 
 function RequestAccountPage({ navigate }: { navigate: (route: PortalRoute) => void }) {
   return (
-    <section className="auth-stage">
-      <article className="auth-card auth-card-wide">
-        <p className="eyebrow">School Onboarding</p>
-        <h2 className="page-title">Request a School Admin Account</h2>
-        <p className="support-copy">
-          School accounts are created after manual verification. Share your school name, city,
-          contact person, and preferred admin email to begin onboarding.
-        </p>
-
-        <div className="auth-points">
-          <div className="auth-point">
-            <strong>What You Receive</strong>
-            <span>A school admin login, a password setup link, and a student invite code.</span>
+    <section className="auth-stage auth-stage-login">
+      <article aria-label="Request school admin account" className="auth-login-shell">
+        <section className="auth-login-pane">
+          <div className="contact-list">
+            <ContactLink icon="mail" href={contactConfig.email ? `mailto:${contactConfig.email}` : null} label="Email" value={contactConfig.email} />
+            <ContactLink icon="call" href={contactConfig.phone ? `tel:${contactConfig.phone}` : null} label="Phone" value={contactConfig.phone} />
+            <ContactLink icon="chat" href={contactConfig.whatsappUrl} label="WhatsApp" value={contactConfig.whatsappUrl ? 'Open WhatsApp' : null} />
           </div>
-          <div className="auth-point">
-            <strong>Student Access</strong>
-            <span>Public app usage stays open; only school-tracked progress requires login.</span>
+
+          {!contactConfig.email && !contactConfig.phone && !contactConfig.whatsappUrl ? (
+            <p className="inline-feedback inline-feedback-error">Contact details are not configured.</p>
+          ) : null}
+
+          <button className="secondary-button" onClick={() => navigate('org-login')} type="button">
+            <Icon name="arrow_back" />
+            <span>Back to School Login</span>
+          </button>
+        </section>
+
+        <section className="auth-promo-pane">
+          <div className="auth-promo-description">
+            <span>Institution access</span>
+            <p>Request a verified workspace for your school to manage learners, invites, and SignSpeak reports.</p>
           </div>
-        </div>
-      </article>
-
-      <article className="auth-card">
-        <p className="eyebrow">Contact Channels</p>
-        <h3 className="card-title">Contact SignSpeak Owner</h3>
-
-        <div className="contact-list">
-          <ContactLink icon="mail" href={contactConfig.email ? `mailto:${contactConfig.email}` : null} label="Email" value={contactConfig.email} />
-          <ContactLink icon="call" href={contactConfig.phone ? `tel:${contactConfig.phone}` : null} label="Phone" value={contactConfig.phone} />
-          <ContactLink icon="chat" href={contactConfig.whatsappUrl} label="WhatsApp" value={contactConfig.whatsappUrl ? 'Open WhatsApp' : null} />
-        </div>
-
-        {!contactConfig.email && !contactConfig.phone && !contactConfig.whatsappUrl ? (
-          <p className="inline-feedback inline-feedback-error">
-            Contact details are not configured yet. Set the Vite contact environment variables.
-          </p>
-        ) : null}
-
-        <button className="secondary-button" onClick={() => navigate('org-login')} type="button">
-          <Icon name="arrow_back" />
-          <span>Back to School Login</span>
-        </button>
+          <div className="auth-promo-ring" aria-hidden="true">
+            <div className="auth-promo-core" />
+          </div>
+        </section>
       </article>
     </section>
   );
