@@ -50,6 +50,7 @@ node_modules/
 **/.gradle/
 **/.kotlin/
 **/local.properties
+kotlin app/gradle.properties
 **/build/
 **/dist/
 *.apk
