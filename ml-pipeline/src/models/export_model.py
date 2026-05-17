@@ -10,16 +10,6 @@ from tensorflow.keras.models import load_model
 from src.config.config import MODELS_DIR
 
 FEATURES_PER_FRAME = 126
-FACE_EMOTION_LABELS = [
-    "angry",
-    "disgust",
-    "fear",
-    "happy",
-    "neutral",
-    "sad",
-    "surprise",
-]
-
 MODEL_ARTIFACTS = {
     "baseline": {
         "model_path": os.path.join(MODELS_DIR, "action_model_baseline_legacy.h5"),
@@ -32,12 +22,6 @@ MODEL_ARTIFACTS = {
         "encoder_path": os.path.join(MODELS_DIR, "label_encoder_augmented_new.pkl"),
         "output_prefix": "action_model_augmented",
         "labels_prefix": "labels_augmented",
-    },
-    "face": {
-        "model_path": os.path.join(MODELS_DIR, "face_model.h5"),
-        "labels": FACE_EMOTION_LABELS,
-        "output_prefix": "face_model",
-        "labels_prefix": "labels_face",
     }
 }
 
@@ -104,7 +88,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Export SignSpeak Keras models to TensorFlow Lite.")
     parser.add_argument(
         "--model",
-        choices=["baseline", "augmented", "face", "all"],
+        choices=["baseline", "augmented", "all"],
         default="all",
         help="Which model to export",
     )

@@ -21,7 +21,6 @@ import com.google.mediapipe.tasks.vision.handlandmarker.HandLandmarkerResult
 import java.io.Closeable
 import java.nio.ByteBuffer
 import java.util.Locale
-import kotlin.math.max
 
 data class HandPoint(
     val x: Float,
@@ -49,7 +48,7 @@ data class HandExtractionOutput(
     val vector: FloatArray,
     val hands: List<HandWireframe>,
     val face: FaceWireframe?,
-    val faceInput: FloatArray? = null
+    val faceExpression: FaceExpressionSignal? = null
 )
 
 class HandExtractor(context: Context) : Closeable {
@@ -64,14 +63,15 @@ class HandExtractor(context: Context) : Closeable {
         private const val FACE_KEYPOINT_NOSE = 2
         private const val FACE_KEYPOINT_RIGHT_EAR = 4
         private const val FACE_KEYPOINT_LEFT_EAR = 5
-        private const val FACE_INPUT_SIZE = 48
     }
 
     private val handLandmarker: HandLandmarker = createHandLandmarker(context)
     private val appContext = context.applicationContext
     private var faceDetector: FaceDetector? = null
+    private var faceBlendshapeAnalyzer: FaceBlendshapeAnalyzer? = null
+    private var faceBlendshapeUnavailable = false
     private val rotationOptionsCache = HashMap<Int, ImageProcessingOptions>(4)
-    private var cachedFaceSnapshot: FaceDetectionSnapshot? = null
+    private var cachedFaceWireframe: FaceWireframe? = null
     private var lastFaceDetectionTimestampMs = -1L
     private var rgbaScratchBytes = ByteArray(0)
     private var rgbaScratchBuffer = ByteBuffer.wrap(rgbaScratchBytes)
@@ -112,7 +112,7 @@ class HandExtractor(context: Context) : Closeable {
         timestampMs: Long,
         includeOverlay: Boolean = true,
         includeFace: Boolean = true,
-        includeFaceInput: Boolean = false
+        includeFaceBlendshapes: Boolean = false
     ): HandExtractionOutput {
         val normalizedRotationDegrees = normalizeRotationDegrees(imageProxy.imageInfo.rotationDegrees)
         val processingOptions = imageProcessingOptionsFor(normalizedRotationDegrees)
@@ -121,12 +121,21 @@ class HandExtractor(context: Context) : Closeable {
 
         return mpImage.use { image ->
             val handResult = handLandmarker.detectForVideo(image, processingOptions, timestampMs)
-            val faceSnapshot = if (includeFace || includeFaceInput) {
+            val faceWireframe = if (includeFace) {
                 detectFaceWithCaching(
                     image = image,
                     processingOptions = processingOptions,
                     timestampMs = timestampMs,
                     rotationDegrees = normalizedRotationDegrees
+                )
+            } else {
+                null
+            }
+            val faceExpression = if (includeFaceBlendshapes) {
+                getOrCreateFaceBlendshapeAnalyzer()?.analyze(
+                    image = image,
+                    processingOptions = processingOptions,
+                    timestampMs = timestampMs
                 )
             } else {
                 null
@@ -139,12 +148,8 @@ class HandExtractor(context: Context) : Closeable {
                 } else {
                     emptyList()
                 },
-                face = if (includeFace) faceSnapshot?.wireframe else null,
-                faceInput = if (includeFaceInput) {
-                    faceSnapshot?.bounds?.let { bounds -> toFaceModelInput(bitmap, bounds) }
-                } else {
-                    null
-                }
+                face = faceWireframe,
+                faceExpression = faceExpression
             )
         }
     }
@@ -154,16 +159,16 @@ class HandExtractor(context: Context) : Closeable {
         processingOptions: ImageProcessingOptions,
         timestampMs: Long,
         rotationDegrees: Int
-    ): FaceDetectionSnapshot? {
+    ): FaceWireframe? {
         val shouldRefresh = lastFaceDetectionTimestampMs < 0L ||
             (timestampMs - lastFaceDetectionTimestampMs) >= FACE_DETECTION_INTERVAL_MS
         if (shouldRefresh) {
             val faceResult = getOrCreateFaceDetector()
                 .detectForVideo(image, processingOptions, timestampMs)
-            cachedFaceSnapshot = toFaceDetectionSnapshot(faceResult, rotationDegrees)
+            cachedFaceWireframe = toFaceWireframe(faceResult, rotationDegrees)
             lastFaceDetectionTimestampMs = timestampMs
         }
-        return cachedFaceSnapshot
+        return cachedFaceWireframe
     }
 
     private fun bitmapFromImageProxy(imageProxy: ImageProxy): Bitmap {
@@ -286,74 +291,6 @@ class HandExtractor(context: Context) : Closeable {
             leftEar = keypoints.getOrNull(FACE_KEYPOINT_LEFT_EAR)?.toHandPoint(rotationDegrees),
             rightEar = keypoints.getOrNull(FACE_KEYPOINT_RIGHT_EAR)?.toHandPoint(rotationDegrees)
         )
-    }
-
-    private fun toFaceDetectionSnapshot(
-        result: FaceDetectorResult,
-        rotationDegrees: Int
-    ): FaceDetectionSnapshot? {
-        val detection = result.detections().firstOrNull() ?: return null
-        val keypoints = detection.extractKeypoints()
-
-        return FaceDetectionSnapshot(
-            wireframe = FaceWireframe(
-                nose = keypoints.getOrNull(FACE_KEYPOINT_NOSE)?.toHandPoint(rotationDegrees),
-                leftEar = keypoints.getOrNull(FACE_KEYPOINT_LEFT_EAR)?.toHandPoint(rotationDegrees),
-                rightEar = keypoints.getOrNull(FACE_KEYPOINT_RIGHT_EAR)?.toHandPoint(rotationDegrees)
-            ),
-            bounds = toNormalizedFaceBounds(keypoints)
-        )
-    }
-
-    private fun toNormalizedFaceBounds(keypoints: List<NormalizedKeypoint>): NormalizedFaceBounds? {
-        val validPoints = keypoints.filter { point ->
-            point.x().isFinite() && point.y().isFinite() &&
-                point.x() in 0f..1f && point.y() in 0f..1f
-        }
-        if (validPoints.isEmpty()) {
-            return null
-        }
-
-        val minX = validPoints.minOf { it.x() }
-        val maxX = validPoints.maxOf { it.x() }
-        val minY = validPoints.minOf { it.y() }
-        val maxY = validPoints.maxOf { it.y() }
-        val centerX = ((minX + maxX) / 2f).coerceIn(0f, 1f)
-        val centerY = ((minY + maxY) / 2f).coerceIn(0f, 1f)
-        val featureSpan = max(maxX - minX, maxY - minY).coerceAtLeast(0.16f)
-        val halfSize = (featureSpan * 0.9f).coerceIn(0.12f, 0.55f)
-
-        return NormalizedFaceBounds(
-            left = (centerX - halfSize).coerceIn(0f, 1f),
-            top = (centerY - halfSize).coerceIn(0f, 1f),
-            right = (centerX + halfSize).coerceIn(0f, 1f),
-            bottom = (centerY + halfSize).coerceIn(0f, 1f)
-        )
-    }
-
-    private fun toFaceModelInput(bitmap: Bitmap, bounds: NormalizedFaceBounds): FloatArray? {
-        val left = (bounds.left * bitmap.width).toInt().coerceIn(0, bitmap.width - 1)
-        val top = (bounds.top * bitmap.height).toInt().coerceIn(0, bitmap.height - 1)
-        val right = (bounds.right * bitmap.width).toInt().coerceIn(left + 1, bitmap.width)
-        val bottom = (bounds.bottom * bitmap.height).toInt().coerceIn(top + 1, bitmap.height)
-        val cropWidth = right - left
-        val cropHeight = bottom - top
-        if (cropWidth <= 1 || cropHeight <= 1) {
-            return null
-        }
-
-        val crop = Bitmap.createBitmap(bitmap, left, top, cropWidth, cropHeight)
-        val scaled = Bitmap.createScaledBitmap(crop, FACE_INPUT_SIZE, FACE_INPUT_SIZE, true)
-        val pixels = IntArray(FACE_INPUT_SIZE * FACE_INPUT_SIZE)
-        scaled.getPixels(pixels, 0, FACE_INPUT_SIZE, 0, 0, FACE_INPUT_SIZE, FACE_INPUT_SIZE)
-
-        return FloatArray(pixels.size) { index ->
-            val pixel = pixels[index]
-            val red = (pixel shr 16) and 0xFF
-            val green = (pixel shr 8) and 0xFF
-            val blue = pixel and 0xFF
-            ((red * 0.299f) + (green * 0.587f) + (blue * 0.114f)) / 255f
-        }
     }
 
     private fun Detection.extractKeypoints(): List<NormalizedKeypoint> {
@@ -525,25 +462,32 @@ class HandExtractor(context: Context) : Closeable {
         }
     }
 
+    private fun getOrCreateFaceBlendshapeAnalyzer(): FaceBlendshapeAnalyzer? {
+        if (faceBlendshapeUnavailable) {
+            return null
+        }
+        val existing = faceBlendshapeAnalyzer
+        if (existing != null) {
+            return existing
+        }
+        val created = try {
+            FaceBlendshapeAnalyzer(appContext)
+        } catch (_: Exception) {
+            faceBlendshapeUnavailable = true
+            return null
+        }
+        faceBlendshapeAnalyzer = created
+        return created
+    }
+
     override fun close() {
         handLandmarker.close()
         faceDetector?.close()
+        faceBlendshapeAnalyzer?.close()
     }
 
     private enum class HandSlot {
         LEFT,
         RIGHT
     }
-
-    private data class FaceDetectionSnapshot(
-        val wireframe: FaceWireframe?,
-        val bounds: NormalizedFaceBounds?
-    )
-
-    private data class NormalizedFaceBounds(
-        val left: Float,
-        val top: Float,
-        val right: Float,
-        val bottom: Float
-    )
 }

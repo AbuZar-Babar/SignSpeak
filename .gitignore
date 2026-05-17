@@ -66,18 +66,12 @@ ml-pipeline/reports/
 ml-pipeline/logs/
 ml-pipeline/models/*.h5
 ml-pipeline/models/*.pkl
-ml-pipeline/models/face_model.tflite
-ml-pipeline/models/face_model_quantized.tflite
-ml-pipeline/models/labels_face.json
 ml-pipeline/.pytest_cache/
-
-# Generated mobile face emotion model artifacts
-kotlin app/app/src/main/assets/face_model.tflite
-kotlin app/app/src/main/assets/face_model_quantized.tflite
-kotlin app/app/src/main/assets/labels_face.json
 
 # Documentation
 SDD/
 SRS/
 graphify-out/
 .obsidian
+.tmp_tasks_core_aar/
+.tmp_tasks_vision_aar/

@@ -108,7 +108,7 @@ class BackendLiveSignEngine(
 
         return LiveInferenceState(
             rawPrediction = latestPredictionSnapshot,
-            faceEmotion = null,
+            faceExpression = null,
             displayedLabel = displayState.label,
             displayedConfidence = displayState.confidence,
             stability = displayState.stability,

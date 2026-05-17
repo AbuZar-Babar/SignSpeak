@@ -211,8 +211,9 @@ fun LiveCameraScreen(
     var statusText by remember { mutableStateOf("Initializing live camera...") }
     var predictedText by remember { mutableStateOf("--") }
     var confidence by remember { mutableFloatStateOf(0f) }
-    var faceEmotionText by remember { mutableStateOf("--") }
-    var faceEmotionConfidence by remember { mutableFloatStateOf(0f) }
+    var faceExpressionText by remember { mutableStateOf("--") }
+    var faceExpressionConfidence by remember { mutableFloatStateOf(0f) }
+    var faceExpressionDebugText by remember { mutableStateOf("") }
     var stability by remember { mutableFloatStateOf(0f) }
     var transcript by remember { mutableStateOf("") }
     var overlayHands by remember { mutableStateOf<List<HandWireframe>>(emptyList()) }
@@ -344,8 +345,9 @@ fun LiveCameraScreen(
         isRecording = false
         recordingGate.set(false)
         lastProcessedFrameNs.set(0L)
-        faceEmotionText = "--"
-        faceEmotionConfidence = 0f
+        faceExpressionText = "--"
+        faceExpressionConfidence = 0f
+        faceExpressionDebugText = ""
         overlayHands = emptyList()
         overlayFace = null
         roundTripMs = null
@@ -369,8 +371,9 @@ fun LiveCameraScreen(
         liveEngineRef.get()?.resetCapture(clearTranscript = false)
         predictedText = "--"
         confidence = 0f
-        faceEmotionText = "--"
-        faceEmotionConfidence = 0f
+        faceExpressionText = "--"
+        faceExpressionConfidence = 0f
+        faceExpressionDebugText = ""
         stability = 0f
         inferenceMs = 0L
         roundTripMs = null
@@ -428,8 +431,9 @@ fun LiveCameraScreen(
         }
         predictedText = "--"
         confidence = 0f
-        faceEmotionText = "--"
-        faceEmotionConfidence = 0f
+        faceExpressionText = "--"
+        faceExpressionConfidence = 0f
+        faceExpressionDebugText = ""
         stability = 0f
         inferenceMs = 0L
         roundTripMs = null
@@ -506,8 +510,14 @@ fun LiveCameraScreen(
                                 fps = liveState.fps
                                 predictedText = liveState.displayedLabel
                                 confidence = liveState.displayedConfidence.coerceIn(0f, 1f)
-                                faceEmotionText = liveState.faceEmotion?.label ?: "--"
-                                faceEmotionConfidence = liveState.faceEmotion?.confidence?.coerceIn(0f, 1f) ?: 0f
+                                faceExpressionText = liveState.faceExpression?.label ?: "--"
+                                faceExpressionConfidence = liveState.faceExpression?.confidence?.coerceIn(0f, 1f) ?: 0f
+                                faceExpressionDebugText = liveState.faceExpression?.topScores
+                                    ?.take(3)
+                                    ?.joinToString("  ") { score ->
+                                        "${score.name.replaceFirstChar { it.uppercase() }} ${(score.score * 100f).roundToInt()}%"
+                                    }
+                                    .orEmpty()
                                 stability = liveState.stability.coerceIn(0f, 1f)
                                 transcript = liveState.transcript
                                 overlayHands = liveState.overlayHands
@@ -1069,26 +1079,36 @@ fun LiveCameraScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = if (faceEmotionText == "--") {
-                                    "Face emotion: detecting"
+                                text = if (faceExpressionText == "--") {
+                                    "Face cues: detecting"
                                 } else {
-                                    "Face emotion: ${faceEmotionText.replaceFirstChar { it.uppercase() }}"
+                                    "Face cues: $faceExpressionText"
                                 },
                                 style = MaterialTheme.typography.bodySmall,
-                                color = Color(0xFFE2F7D7),
+                                color = Color(0xFFFFE7A3),
                                 modifier = Modifier.weight(1f),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
                             Text(
-                                text = if (faceEmotionConfidence > 0f) {
-                                    "${(faceEmotionConfidence * 100f).roundToInt()}%"
+                                text = if (faceExpressionConfidence > 0f) {
+                                    "${(faceExpressionConfidence * 100f).roundToInt()}%"
                                 } else {
                                     ""
                                 },
                                 style = MaterialTheme.typography.bodySmall,
                                 fontWeight = FontWeight.SemiBold,
-                                color = Color(0xFFE2F7D7)
+                                color = Color(0xFFFFE7A3)
+                            )
+                        }
+                        if (faceExpressionDebugText.isNotBlank()) {
+                            Text(
+                                text = faceExpressionDebugText,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFFD7C07A),
+                                modifier = Modifier.fillMaxWidth(),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
 
