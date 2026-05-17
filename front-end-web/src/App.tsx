@@ -88,6 +88,26 @@ function isCreateOrgAdminResult(value: unknown): value is CreateOrgAdminResult {
   );
 }
 
+async function functionErrorMessage(error: unknown): Promise<string> {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'context' in error &&
+    error.context instanceof Response
+  ) {
+    try {
+      const body = (await error.context.clone().json()) as { error?: string };
+      if (body.error) {
+        return body.error;
+      }
+    } catch {
+      // Fall through to the generic error message below.
+    }
+  }
+
+  return error instanceof Error ? error.message : 'Unable to complete the request.';
+}
+
 function formatDate(value: string | null): string {
   if (!value) {
     return 'Not set';
@@ -528,6 +548,12 @@ export default function App() {
       return;
     }
 
+    if (isSuperAdmin) {
+      setComplaints([]);
+      setSelectedComplaintId(null);
+      return;
+    }
+
     if (!isSuperAdmin && !selectedOrganizationId) {
       setComplaints([]);
       setSelectedComplaintId(null);
@@ -704,13 +730,57 @@ export default function App() {
     setAuthError(null);
     setAuthNotice(null);
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email: email.trim(),
       password,
     });
 
     if (error) {
       setAuthError(error.message);
+      setAuthBusy(false);
+      return;
+    }
+
+    const userId = data.user?.id;
+    if (!userId) {
+      await supabase.auth.signOut();
+      clearAuthenticatedState();
+      setAuthError('Unable to validate this account.');
+      setAuthBusy(false);
+      return;
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', userId)
+      .single();
+
+    if (profileError) {
+      await supabase.auth.signOut();
+      clearAuthenticatedState();
+      setAuthError(profileError.message);
+      setAuthBusy(false);
+      return;
+    }
+
+    const signedInRole = (profile.role as UserRole | null) ?? null;
+    const signedInAsSuperAdmin = signedInRole === 'admin';
+
+    if (loginMode === 'organization' && signedInAsSuperAdmin) {
+      await supabase.auth.signOut();
+      clearAuthenticatedState();
+      setPassword('');
+      setAuthError('Use the Super Admin Login page for this account.');
+      setAuthBusy(false);
+      return;
+    }
+
+    if (loginMode === 'super' && !signedInAsSuperAdmin) {
+      await supabase.auth.signOut();
+      clearAuthenticatedState();
+      setPassword('');
+      setAuthError('Use the school admin login page for this account.');
       setAuthBusy(false);
       return;
     }
@@ -824,7 +894,7 @@ export default function App() {
     });
 
     if (error) {
-      setOrganizationsError(error.message);
+      setOrganizationsError(await functionErrorMessage(error));
       setOrganizationBusy(false);
       return;
     }
@@ -1058,32 +1128,49 @@ export default function App() {
         </div>
 
         <nav className="sidebar-nav">
-          <button className="nav-item nav-item-active" type="button">
-            <Icon name="dashboard" />
-            <span>{isSuperAdmin ? 'Platform' : 'Institute'}</span>
-          </button>
-          <button className="nav-item" type="button">
-            <Icon name="forum" />
-            <span>Complaints</span>
-          </button>
-          <button className="nav-item" type="button">
-            <Icon name="leaderboard" />
-            <span>Analytics</span>
-          </button>
+          {isSuperAdmin ? (
+            <>
+              <button className="nav-item nav-item-active" type="button">
+                <Icon name="domain_add" />
+                <span>Add institution</span>
+              </button>
+              <button className="nav-item" type="button">
+                <Icon name="leaderboard" />
+                <span>Analytics</span>
+              </button>
+            </>
+          ) : (
+            <>
+              <button className="nav-item nav-item-active" type="button">
+                <Icon name="dashboard" />
+                <span>Institute</span>
+              </button>
+              <button className="nav-item" type="button">
+                <Icon name="forum" />
+                <span>Complaints</span>
+              </button>
+              <button className="nav-item" type="button">
+                <Icon name="leaderboard" />
+                <span>Analytics</span>
+              </button>
+            </>
+          )}
         </nav>
 
         <div className="sidebar-summary panel">
           <p className="sidebar-summary-title">
             {isSuperAdmin ? 'Selected institute' : 'Institute status'}
           </p>
-          <div className="progress-track">
-            <div
-              className="progress-value"
-              style={{
-                width: `${complaints.length ? Math.round((complaintMetrics.resolved / complaints.length) * 100) : 0}%`,
-              }}
-            />
-          </div>
+          {!isSuperAdmin ? (
+            <div className="progress-track">
+              <div
+                className="progress-value"
+                style={{
+                  width: `${complaints.length ? Math.round((complaintMetrics.resolved / complaints.length) * 100) : 0}%`,
+                }}
+              />
+            </div>
+          ) : null}
           <p className="sidebar-summary-copy">
             {selectedOrganization
               ? `${selectedOrganization.name} has ${organizationUsers.length} registered users.`
@@ -1109,15 +1196,17 @@ export default function App() {
           </div>
 
           <div className="topbar-tools">
-            <form className="topbar-search" onSubmit={handleSearchSubmit}>
-              <Icon name="search" />
-              <input
-                onChange={(event) => setSearchDraft(event.target.value)}
-                placeholder="Search complaints by word, note, name, or email"
-                type="search"
-                value={searchDraft}
-              />
-            </form>
+            {!isSuperAdmin ? (
+              <form className="topbar-search" onSubmit={handleSearchSubmit}>
+                <Icon name="search" />
+                <input
+                  onChange={(event) => setSearchDraft(event.target.value)}
+                  placeholder="Search complaints by word, note, name, or email"
+                  type="search"
+                  value={searchDraft}
+                />
+              </form>
+            ) : null}
 
             <button
               aria-label="Toggle dark mode"
@@ -1208,32 +1297,34 @@ export default function App() {
             </section>
           )}
 
-          <ComplaintWorkspace
-            adminNoteDraft={adminNoteDraft}
-            clearFilters={clearFilters}
-            complaints={complaints}
-            complaintMetrics={complaintMetrics}
-            filteredResultLabel={filteredResultLabel}
-            isSuperAdmin={isSuperAdmin}
-            listError={listError}
-            listLoading={listLoading}
-            pendingCount={pendingCount}
-            refreshList={() => setRefreshKey((value) => value + 1)}
-            saveBusy={saveBusy}
-            saveComplaint={saveComplaint}
-            saveError={saveError}
-            saveNotice={saveNotice}
-            selectedComplaint={selectedComplaint}
-            selectedComplaintId={selectedComplaintId}
-            setAdminNoteDraft={setAdminNoteDraft}
-            setSelectedComplaintId={setSelectedComplaintId}
-            setSourceFilter={setSourceFilter}
-            setStatusDraft={setStatusDraft}
-            sourceFilter={sourceFilter}
-            statusDraft={statusDraft}
-            statusFilter={statusFilter}
-            setStatusFilter={setStatusFilter}
-          />
+          {!isSuperAdmin ? (
+            <ComplaintWorkspace
+              adminNoteDraft={adminNoteDraft}
+              clearFilters={clearFilters}
+              complaints={complaints}
+              complaintMetrics={complaintMetrics}
+              filteredResultLabel={filteredResultLabel}
+              isSuperAdmin={isSuperAdmin}
+              listError={listError}
+              listLoading={listLoading}
+              pendingCount={pendingCount}
+              refreshList={() => setRefreshKey((value) => value + 1)}
+              saveBusy={saveBusy}
+              saveComplaint={saveComplaint}
+              saveError={saveError}
+              saveNotice={saveNotice}
+              selectedComplaint={selectedComplaint}
+              selectedComplaintId={selectedComplaintId}
+              setAdminNoteDraft={setAdminNoteDraft}
+              setSelectedComplaintId={setSelectedComplaintId}
+              setSourceFilter={setSourceFilter}
+              setStatusDraft={setStatusDraft}
+              sourceFilter={sourceFilter}
+              statusDraft={statusDraft}
+              statusFilter={statusFilter}
+              setStatusFilter={setStatusFilter}
+            />
+          ) : null}
         </main>
       </div>
     </div>
