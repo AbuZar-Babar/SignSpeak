@@ -63,6 +63,8 @@ kotlin app/gradle.properties
 ml-pipeline/data/processed/*.joblib
 ml-pipeline/reports/
 ml-pipeline/logs/
+ml-pipeline/models/old/
+ml-pipeline/models/new/
 ml-pipeline/models/*.h5
 ml-pipeline/models/*.pkl
 ml-pipeline/.pytest_cache/
