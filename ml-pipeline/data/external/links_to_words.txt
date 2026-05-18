@@ -60,7 +60,11 @@ Detected on mobile:
 57. peacock: https://psl.org.pk/dictionary/17-birds/761-peacock (30. Detects)
 58. arrival: https://psl.org.pk/dictionary/3-airport/163-arrival (X)
 59. umbrella: https://psl.org.pk/dictionary/14-beach/628-umbrella (31. Detects)
-
+60: where: https://psl.org.pk/dictionary/65-sentences/4389-where
+61: doctor: https://psl.org.pk/dictionary/62-professions/3957-doctor
+62: who: https://psl.org.pk/dictionary/65-sentences/4391-who
+63: help: https://psl.org.pk/dictionary/72-verbs/5071-help
+64: hungry: https://psl.org.pk/dictionary/1-adjectives/5665-hungry
 
 
 

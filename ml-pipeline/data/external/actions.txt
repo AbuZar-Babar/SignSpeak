@@ -60,4 +60,9 @@ peacock
 arrival
 umbrella
 left_hand
-test2
+where
+doctor
+who
+help
+need
+hungry
