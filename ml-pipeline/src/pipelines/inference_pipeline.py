@@ -10,7 +10,7 @@ import os
 from src.config.config import load_actions, SEQUENCE_LENGTH, PREDICTION_THRESHOLD, MODELS_DIR
 
 def main():
-    model_path = os.path.join(MODELS_DIR, "action_model_baseline_legacy.h5")
+    model_path = os.path.join(MODELS_DIR, "action_model_baseline_legacy_v3.h5")
     encoder_path = os.path.join(MODELS_DIR, "label_encoder_baseline_old.pkl")
     print(f"Loading {model_path}...")
     actions = load_actions()

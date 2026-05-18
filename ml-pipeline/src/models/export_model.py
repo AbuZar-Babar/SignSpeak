@@ -13,11 +13,11 @@ FEATURES_PER_FRAME = 126
 
 MODEL_ARTIFACTS = {
     "baseline": {
-        "model_path": os.path.join(MODELS_DIR, "action_model_baseline_legacy.h5"),
+        "model_path": os.path.join(MODELS_DIR, "action_model_baseline_legacy_v3.h5"),
         "encoder_path": os.path.join(MODELS_DIR, "label_encoder_baseline_new.pkl"),
     },
     "augmented": {
-        "model_path": os.path.join(MODELS_DIR, "action_model_augmented_legacy.h5"),
+        "model_path": os.path.join(MODELS_DIR, "action_model_augmented_legacy_v3.h5"),
         "encoder_path": os.path.join(MODELS_DIR, "label_encoder_augmented_new.pkl"),
     }
 }

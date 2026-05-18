@@ -9,7 +9,7 @@ DATASET_FOLDERS = {
     "laptop": os.path.join(PROJECT_ROOT, "data", "raw", "MP_Data"),         
     "mobile": os.path.join(PROJECT_ROOT, "data", "raw", "MP_Data_mobile"),  
 }
-_dataset_setting = os.getenv("SIGNSPEAK_DATASET", "mobile").strip() # Change this line to swap to change dataset
+_dataset_setting = os.getenv("SIGNSPEAK_DATASET", "laptop").strip() # Change this line to swap to change dataset
 ACTIVE_DATASET = _dataset_setting.lower()
 DATA_FOLDER = DATASET_FOLDERS.get(ACTIVE_DATASET, _dataset_setting) or DATASET_FOLDERS["mobile"]
 
@@ -26,7 +26,7 @@ DATA_PATH = DATA_FOLDER
 
 # Recording params
 SEQUENCE_LENGTH = 60          # number of frames per sequence (2 sec on webcam, 3 secs on mobile)
-NUM_SEQUENCES = 20            # how many sequences per action 
+NUM_SEQUENCES = 50            # how many sequences per action 
 FRAME_WAIT_MS = 1           # delay between frames
 # Model params
 BATCH_SIZE = 16
