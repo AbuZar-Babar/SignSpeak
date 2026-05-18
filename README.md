@@ -2,7 +2,7 @@
 
 **Developed by [Mohib Ullah Khan Sherwani](https://github.com/MohibUllahKhanSherwani) & [AbuZar Babar](https://github.com/AbuZar-Babar)**
 
-SignSpeak is a Final Year Project focused on Pakistan Sign Language (PSL) dataset and its recognition on a mobile app.
+SignSpeak is a Final Year Project focused on Pakistan Sign Language (PSL) dataset collection, training, and recognition.
 - We contributed a [Pakistan Sign Language (PSL) dataset](https://www.kaggle.com/datasets/mohib123456/dynamic-word-level-pakistan-sign-language-dataset/data) for dynamic word-level recognition.
 
 ## Modules & Deep Dives
@@ -11,7 +11,7 @@ This repository is a multi-module workspace. **For detailed instructions, archit
 
 | Module | Purpose | README |
 | --- | --- | --- |
-| **Kotlin App** | Android app for real-time translation and PSL dictionary | [`kotlin app/README.md`](./kotlin%20app/README.md) |
+| **Kotlin App** | Android app for phone-based PSL landmark collection | [`kotlin app/README.md`](./kotlin%20app/README.md) |
 | **Admin Portal** | React + Vite portal for complaint review | [`front-end-web/README.md`](./front-end-web/README.md) |
 | **ML Pipeline** | Python pipeline for data collection, training, and inference | [`ml-pipeline/README.md`](./ml-pipeline/README.md) |
 | **Backend** | Supabase schema, seed data, and SQL helpers | [`supabase/README.md`](./supabase/README.md) |
@@ -49,13 +49,15 @@ npm run dev
 
 > *For full setup guide, package structure, and troubleshooting, see [`kotlin app/README.md`](./kotlin%20app/README.md).*
 
-Open `kotlin app/` in Android Studio, or run via Gradle (ensure Supabase credentials are set in Gradle properties or env vars):
+Open `kotlin app/` in Android Studio, or run via Gradle:
 
 ```bash
 cd "kotlin app"
 # On Windows use .\gradlew.bat app:installDebug
 ./gradlew app:installDebug
 ```
+
+The app saves collected samples as JSON files under `Downloads/SignSpeakCollector/<action>/`.
 
 ### 5. Run the ML Pipeline (Python)
 

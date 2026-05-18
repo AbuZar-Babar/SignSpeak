@@ -13,43 +13,64 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.text.SimpleDateFormat
+import java.time.Instant
 import java.util.Date
 import java.util.Locale
 
 data class JsonSaveResult(
     val uri: Uri,
-    val fileName: String
+    val fileName: String,
+    val displayPath: String
 )
 
 class JsonWriter(private val context: Context) {
     companion object {
-        const val SEQUENCE_LENGTH = 30
+        const val FORMAT = "signspeak-landmarks-v1"
+        const val SOURCE = "mobile"
+        const val SEQUENCE_LENGTH = 60
         const val FRAME_DIM = 126
+        private const val DOWNLOADS_FOLDER = "SignSpeakCollector"
     }
 
     fun writeToDownloads(
-        baseName: String,
+        action: String,
         frameVectors: List<FloatArray>,
         sequenceLength: Int = SEQUENCE_LENGTH,
         dim: Int = FRAME_DIM
     ): JsonSaveResult {
-        validateShape(frameVectors, sequenceLength, dim)
+        val safeAction = normalizeAction(action)
+        validateShape(safeAction, frameVectors, sequenceLength, dim)
 
         val payload = buildJsonPayload(
+            action = safeAction,
             sequenceLength = sequenceLength,
             dim = dim,
             frameVectors = frameVectors
         )
-        val fileName = buildFileName(baseName)
+        val fileName = buildFileName(safeAction)
 
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            writeWithMediaStore(fileName, payload)
+            writeWithMediaStore(safeAction, fileName, payload)
         } else {
-            writeLegacy(fileName, payload)
+            writeLegacy(safeAction, fileName, payload)
         }
     }
 
-    private fun validateShape(frameVectors: List<FloatArray>, sequenceLength: Int, dim: Int) {
+    private fun normalizeAction(raw: String): String {
+        return raw
+            .trim()
+            .lowercase(Locale.US)
+            .replace(Regex("\\s+"), "_")
+            .replace(Regex("[^a-z0-9_-]"), "")
+    }
+
+    private fun validateShape(
+        action: String,
+        frameVectors: List<FloatArray>,
+        sequenceLength: Int,
+        dim: Int
+    ) {
+        require(action.isNotBlank()) { "Action name is required." }
         require(frameVectors.size == sequenceLength) {
             "Expected $sequenceLength frames, received ${frameVectors.size}."
         }
@@ -61,6 +82,7 @@ class JsonWriter(private val context: Context) {
     }
 
     private fun buildJsonPayload(
+        action: String,
         sequenceLength: Int,
         dim: Int,
         frameVectors: List<FloatArray>
@@ -75,33 +97,37 @@ class JsonWriter(private val context: Context) {
         }
 
         return JSONObject().apply {
+            put("format", FORMAT)
+            put("source", SOURCE)
+            put("action", action)
             put("sequence_length", sequenceLength)
             put("dim", dim)
+            put("created_at", Instant.now().toString())
             put("frames", framesArray)
         }.toString(2)
     }
 
-    private fun buildFileName(baseName: String): String {
-        val safeName = baseName
-            .trim()
-            .ifBlank { "landmarks_sequence" }
-            .replace(Regex("[^A-Za-z0-9._-]"), "_")
-        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-        return "${safeName}_${timestamp}.json"
+    private fun buildFileName(action: String): String {
+        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(Date())
+        return "${action}_${timestamp}.json"
     }
 
     @RequiresApi(Build.VERSION_CODES.Q)
-    private fun writeWithMediaStore(fileName: String, payload: String): JsonSaveResult {
+    private fun writeWithMediaStore(
+        action: String,
+        fileName: String,
+        payload: String
+    ): JsonSaveResult {
         val resolver = context.contentResolver
-        val collection = MediaStore.Downloads.EXTERNAL_CONTENT_URI
+        val relativePath = "${Environment.DIRECTORY_DOWNLOADS}/$DOWNLOADS_FOLDER/$action"
         val values = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
             put(MediaStore.MediaColumns.MIME_TYPE, "application/json")
-            put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+            put(MediaStore.MediaColumns.RELATIVE_PATH, relativePath)
             put(MediaStore.MediaColumns.IS_PENDING, 1)
         }
 
-        val itemUri = resolver.insert(collection, values)
+        val itemUri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
             ?: throw IOException("Failed to create Downloads entry.")
 
         try {
@@ -109,12 +135,17 @@ class JsonWriter(private val context: Context) {
                 stream.write(payload.toByteArray(Charsets.UTF_8))
             } ?: throw IOException("Failed to open output stream for $itemUri")
 
-            val completed = ContentValues().apply {
-                put(MediaStore.MediaColumns.IS_PENDING, 0)
-            }
-            resolver.update(itemUri, completed, null, null)
-
-            return JsonSaveResult(uri = itemUri, fileName = fileName)
+            resolver.update(
+                itemUri,
+                ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) },
+                null,
+                null
+            )
+            return JsonSaveResult(
+                uri = itemUri,
+                fileName = fileName,
+                displayPath = "$relativePath/$fileName"
+            )
         } catch (error: Exception) {
             resolver.delete(itemUri, null, null)
             throw error
@@ -122,18 +153,27 @@ class JsonWriter(private val context: Context) {
     }
 
     @Suppress("DEPRECATION")
-    private fun writeLegacy(fileName: String, payload: String): JsonSaveResult {
+    private fun writeLegacy(
+        action: String,
+        fileName: String,
+        payload: String
+    ): JsonSaveResult {
         val downloadsDir = Environment.getExternalStoragePublicDirectory(
             Environment.DIRECTORY_DOWNLOADS
         )
-        if (!downloadsDir.exists() && !downloadsDir.mkdirs()) {
-            throw IOException("Unable to create Downloads directory.")
+        val outputDir = File(File(downloadsDir, DOWNLOADS_FOLDER), action)
+        if (!outputDir.exists() && !outputDir.mkdirs()) {
+            throw IOException("Unable to create ${outputDir.absolutePath}.")
         }
 
-        val outputFile = File(downloadsDir, fileName)
+        val outputFile = File(outputDir, fileName)
         FileOutputStream(outputFile).use { stream ->
             stream.write(payload.toByteArray(Charsets.UTF_8))
         }
-        return JsonSaveResult(uri = Uri.fromFile(outputFile), fileName = fileName)
+        return JsonSaveResult(
+            uri = Uri.fromFile(outputFile),
+            fileName = fileName,
+            displayPath = outputFile.absolutePath
+        )
     }
 }

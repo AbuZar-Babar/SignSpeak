@@ -1,25 +1,20 @@
 package com.example.kotlinfrontend
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
-import android.util.Log
 import android.util.Size
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -27,98 +22,85 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CameraAlt
 import androidx.compose.material.icons.rounded.Cameraswitch
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
-import androidx.compose.material.icons.rounded.FlashOff
-import androidx.compose.material.icons.rounded.FlashOn
-import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Replay
+import androidx.compose.material.icons.rounded.Save
+import androidx.compose.material.icons.rounded.Stop
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.collectAsState
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import com.example.kotlinfrontend.app.SignSpeakApp
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.LifecycleOwner
 import com.example.kotlinfrontend.ui.theme.KotlinFrontendTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.net.URI
-import java.time.Instant
+import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
-import java.util.concurrent.atomic.AtomicReference
-import kotlin.math.roundToInt
+import kotlin.math.abs
 
-import com.example.kotlinfrontend.ui.root.SignSpeakRoot
-
-class MainActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        val app = application as SignSpeakApp
-        setContent {
-            KotlinFrontendTheme {
-                Surface(color = MaterialTheme.colorScheme.background) {
-                    SignSpeakRoot(container = app.appContainer)
-                }
-            }
-        }
-    }
-}
+private const val COLLECTION_FORMAT = "signspeak-landmarks-v1"
+private const val SEQUENCE_LENGTH = 60
+private const val FRAME_DIM = 126
+private const val TARGET_FPS = 20
+private const val ANALYSIS_WIDTH = 640
+private const val ANALYSIS_HEIGHT = 480
 
 private val HAND_CONNECTIONS: List<Pair<Int, Int>> = listOf(
     0 to 1, 1 to 2, 2 to 3, 3 to 4,
@@ -129,1359 +111,820 @@ private val HAND_CONNECTIONS: List<Pair<Int, Int>> = listOf(
     0 to 17
 )
 
-private fun validateAndNormalizeBackendUrl(rawValue: String): String {
-    val normalized = rawValue.trim().trimEnd('/')
-    require(normalized.isNotBlank()) { "Backend URL is required." }
-
-    val uri = try {
-        URI(normalized)
-    } catch (_: Exception) {
-        throw IllegalArgumentException("Enter a valid http:// or https:// URL.")
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContent {
+            KotlinFrontendTheme {
+                CollectorApp()
+            }
+        }
     }
+}
 
-    val scheme = uri.scheme?.lowercase().orEmpty()
-    require(scheme == "http" || scheme == "https") {
-        "Enter a valid http:// or https:// URL."
-    }
-    require(!uri.host.isNullOrBlank()) {
-        "Enter a valid backend host."
-    }
-
-    return normalized
+private enum class CapturePhase {
+    Idle,
+    Countdown,
+    Recording,
+    Captured,
+    Saving
 }
 
 @Composable
-fun LiveCameraScreen(
-    productMode: Boolean = false,
-    isAuthenticated: Boolean = false,
-    onRequireAuth: () -> Unit = {},
-    onWordCommitted: (word: String, confidence: Float, model: SignModel, createdAt: String) -> Unit =
-        { _, _, _, _ -> },
-    onReportPrediction: (word: String, confidence: Float, model: SignModel) -> Unit =
-        { _, _, _ -> },
-    onModelOptionsContentChange: ((@Composable () -> Unit)?) -> Unit = {}
-) {
+private fun CollectorApp() {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val mainExecutor = remember { ContextCompat.getMainExecutor(context) }
+    val analysisExecutor = remember { Executors.newSingleThreadExecutor() }
     val previewView = remember {
         PreviewView(context).apply {
             implementationMode = PreviewView.ImplementationMode.COMPATIBLE
             scaleType = PreviewView.ScaleType.FIT_CENTER
         }
     }
-    val analysisExecutor: ExecutorService = remember { Executors.newSingleThreadExecutor() }
-    val modelLoadExecutor: ExecutorService = remember { Executors.newSingleThreadExecutor() }
-    val recordingGate = remember { AtomicBoolean(false) }
-    val modelReadyGate = remember { AtomicBoolean(false) }
-    val sessionCounter = remember { AtomicInteger(0) }
-    val liveEngineRef = remember { AtomicReference<StreamingSignEngine?>(null) }
-    val targetFpsGate = remember { AtomicInteger(50) }
-    val lastProcessedFrameNs = remember { AtomicLong(0L) }
-    val overlayEnabledGate = remember { AtomicBoolean(false) }
-    val faceEnabledGate = remember { AtomicBoolean(false) }
-    val backendSettingsRepository = remember { BackendSettingsRepository(context.applicationContext) }
-    val backendClient = remember { SignBackendClient() }
+    val captureGate = remember { AtomicBoolean(false) }
+    val lastAcceptedFrameNs = remember { AtomicLong(0L) }
+    val frameBuffer = remember { mutableListOf<FloatArray>() }
+    val frameBufferLock = remember { Any() }
+    val statsStore = remember { CollectorStatsStore(context.applicationContext) }
+    val writer = remember { JsonWriter(context.applicationContext) }
     val coroutineScope = rememberCoroutineScope()
-    // Active camera reference (for torch control)
-    val activeCameraRef = remember { AtomicReference<Camera?>(null) }
+    val builtInActions = remember { loadCollectorActions(context) }
 
-    var hasPermission by remember {
+    var hasCameraPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
                 PackageManager.PERMISSION_GRANTED
         )
     }
-    var inferenceMode by remember { mutableStateOf(InferenceMode.ON_DEVICE) }
-    var selectedModel by remember { mutableStateOf(SignModel.BASELINE) }
-    var useQuantizedModel by remember { mutableStateOf(false) }
-    var performanceMode by remember { mutableStateOf(true) }
-    var showHandOverlay by remember { mutableStateOf(false) }
-    var showFaceOverlay by remember { mutableStateOf(false) }
-    // ── New user-facing camera controls ──────────────────────────────────────
-    var useFrontCamera by remember { mutableStateOf(true) }
-    var torchEnabled by remember { mutableStateOf(false) }
-    var settingsExpanded by remember { mutableStateOf(false) }
-    // ─────────────────────────────────────────────────────────────────────────
-    var controlsExpanded by remember { mutableStateOf(false) }
-    var isRecording by remember { mutableStateOf(false) }
-    var isModelLoading by remember { mutableStateOf(false) }
-    var isModelReady by remember { mutableStateOf(false) }
-    var targetCaptureFps by remember { mutableIntStateOf(50) }
-    var statusText by remember { mutableStateOf("Initializing live camera...") }
-    var predictedText by remember { mutableStateOf("--") }
-    var confidence by remember { mutableFloatStateOf(0f) }
-    var stability by remember { mutableFloatStateOf(0f) }
-    var transcript by remember { mutableStateOf("") }
-    var overlayHands by remember { mutableStateOf<List<HandWireframe>>(emptyList()) }
-    var overlayFace by remember { mutableStateOf<FaceWireframe?>(null) }
-    var fps by remember { mutableFloatStateOf(0f) }
-    var handsInFrame by remember { mutableIntStateOf(0) }
-    var bufferCount by remember { mutableIntStateOf(0) }
-    var sequenceLength by remember { mutableIntStateOf(60) }
-    var capturedFrameCount by remember { mutableIntStateOf(0) }
-    var inferenceMs by remember { mutableLongStateOf(0L) }
-    var roundTripMs by remember { mutableStateOf<Long?>(null) }
-    var requestInFlight by remember { mutableStateOf(false) }
-    var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
-    var backendUrlInput by remember { mutableStateOf("") }
-    var activeBackendUrl by remember { mutableStateOf("") }
-    var backendUrlError by remember { mutableStateOf<String?>(null) }
-    var backendConnectionMessage by remember { mutableStateOf<String?>(null) }
-    var isBackendReachable by remember { mutableStateOf(false) }
-    var isBackendChecking by remember { mutableStateOf(false) }
-    var didLoadSavedBackendUrl by remember { mutableStateOf(false) }
-    var lastObservedCommitCount by remember { mutableIntStateOf(0) }
-
-    // ── Smart Sentences (Gemini LLM) ──────────────────────────────────────────
-    var sentenceModeEnabled by remember { mutableStateOf(false) }
-    var sentenceLanguage by remember { mutableStateOf(SentenceLanguage.BOTH) }
-    var formedSentence by remember { mutableStateOf("") }
-    var isSentenceLoading by remember { mutableStateOf(false) }
-    var sentenceError by remember { mutableStateOf(false) }
-    var sentenceErrorMessage by remember { mutableStateOf<String?>(null) }
-    val sentenceWordThreshold = 3
-    var sentenceDebounceJob by remember { mutableStateOf<Job?>(null) }
-    val geminiSentenceFormer = remember {
-        GeminiSentenceFormer(BuildConfig.GEMINI_API_KEY)
+    var suggestedActions by remember {
+        mutableStateOf(mergeCollectorActions(builtInActions, statsStore.loadCustomActions()))
     }
-    var sentenceRequestVersion by remember { mutableIntStateOf(0) }
+    var actionText by remember { mutableStateOf(suggestedActions.firstOrNull().orEmpty()) }
+    var useFrontCamera by remember { mutableStateOf(true) }
+    var autoContinue by remember { mutableStateOf(statsStore.loadAutoContinue()) }
+    var phase by remember { mutableStateOf(CapturePhase.Idle) }
+    var countdown by remember { mutableIntStateOf(0) }
+    var recordedFrames by remember { mutableIntStateOf(0) }
+    var detectedFrames by remember { mutableIntStateOf(0) }
+    var capturedFrames by remember { mutableStateOf<List<FloatArray>>(emptyList()) }
+    var overlayHands by remember { mutableStateOf<List<HandWireframe>>(emptyList()) }
+    var statusText by remember { mutableStateOf("Grant camera permission, choose a sign, then record.") }
+    var lastExportPath by remember { mutableStateOf<String?>(null) }
+    var savedCounts by remember { mutableStateOf(statsStore.loadAll()) }
+    var countdownJob by remember { mutableStateOf<Job?>(null) }
 
-    LaunchedEffect(Unit) {
-        val key = BuildConfig.GEMINI_API_KEY.trim()
-        Log.d(
-            "GeminiSentenceFormer",
-            "Runtime Gemini key diagnostic: length=${key.length}, prefix=${key.take(6)}"
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        hasCameraPermission = granted
+        statusText = if (granted) {
+            "Camera ready. Choose a sign and record."
+        } else {
+            "Camera permission is required for collection."
+        }
+    }
+    val storagePermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        statusText = if (granted) {
+            "Storage permission granted. Tap Save Sample again."
+        } else {
+            "Storage permission is required on this Android version."
+        }
+    }
+
+    val selectedAction = normalizeActionName(actionText)
+    val selectedActionCount = if (selectedAction.isBlank()) {
+        0
+    } else {
+        savedCounts[selectedAction] ?: 0
+    }
+
+    fun persistAction(action: String) {
+        if (action.isBlank()) {
+            return
+        }
+        statsStore.addCustomAction(action)
+        suggestedActions = mergeCollectorActions(builtInActions, statsStore.loadCustomActions())
+    }
+
+    fun addCurrentAction() {
+        val action = normalizeActionName(actionText)
+        if (action.isBlank()) {
+            statusText = "Enter a word before adding it."
+            return
+        }
+        actionText = action
+        persistAction(action)
+        statusText = "Added $action to this phone."
+    }
+
+    fun resetCaptureState(message: String) {
+        captureGate.set(false)
+        lastAcceptedFrameNs.set(0L)
+        synchronized(frameBufferLock) {
+            frameBuffer.clear()
+        }
+        recordedFrames = 0
+        detectedFrames = 0
+        overlayHands = emptyList()
+        capturedFrames = emptyList()
+        countdown = 0
+        phase = CapturePhase.Idle
+        statusText = message
+    }
+
+    fun startCapture() {
+        val action = normalizeActionName(actionText)
+        if (action.isBlank()) {
+            statusText = "Enter an action name before recording."
+            return
+        }
+        if (!hasCameraPermission) {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+            return
+        }
+        persistAction(action)
+
+        countdownJob?.cancel()
+        captureGate.set(false)
+        lastAcceptedFrameNs.set(0L)
+        synchronized(frameBufferLock) {
+            frameBuffer.clear()
+        }
+        recordedFrames = 0
+        detectedFrames = 0
+        capturedFrames = emptyList()
+        overlayHands = emptyList()
+        lastExportPath = null
+
+        countdownJob = coroutineScope.launch {
+            phase = CapturePhase.Countdown
+            statusText = "Get ready for $action."
+            for (value in 2 downTo 1) {
+                countdown = value
+                delay(1_000L)
+            }
+            countdown = 0
+            phase = CapturePhase.Recording
+            statusText = "Recording $SEQUENCE_LENGTH frames at $TARGET_FPS FPS."
+            captureGate.set(true)
+        }
+    }
+
+    fun stopCapture() {
+        countdownJob?.cancel()
+        resetCaptureState("Recording stopped. Ready for another sample.")
+    }
+
+    fun saveFrames(
+        action: String,
+        frames: List<FloatArray>,
+        continueAfterSave: Boolean
+    ) {
+        if (action.isBlank()) {
+            statusText = "Enter an action name before saving."
+            return
+        }
+        if (frames.size != SEQUENCE_LENGTH) {
+            statusText = "No complete sample is ready to save."
+            return
+        }
+        if (needsLegacyStoragePermission(context)) {
+            capturedFrames = frames
+            phase = CapturePhase.Captured
+            storagePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            return
+        }
+
+        persistAction(action)
+        phase = CapturePhase.Saving
+        statusText = "Saving $action sample..."
+        coroutineScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                writer.writeToDownloads(
+                    action = action,
+                    frameVectors = frames,
+                    sequenceLength = SEQUENCE_LENGTH,
+                    dim = FRAME_DIM
+                )
+            }
+            val newCount = statsStore.increment(action)
+            savedCounts = savedCounts + (action to newCount)
+            lastExportPath = result.displayPath
+            capturedFrames = emptyList()
+            recordedFrames = 0
+            detectedFrames = 0
+            overlayHands = emptyList()
+            phase = CapturePhase.Idle
+            statusText = if (continueAfterSave && autoContinue) {
+                "Saved ${result.fileName}. Continuing..."
+            } else {
+                "Saved ${result.fileName}."
+            }
+
+            if (continueAfterSave && autoContinue && normalizeActionName(actionText) == action) {
+                delay(650L)
+                startCapture()
+            }
+        }
+    }
+
+    fun saveCapturedSample() {
+        saveFrames(
+            action = normalizeActionName(actionText),
+            frames = capturedFrames,
+            continueAfterSave = false
         )
     }
 
-    // Sync torch whenever torchEnabled changes
-    LaunchedEffect(torchEnabled) {
-        activeCameraRef.get()?.cameraControl?.enableTorch(torchEnabled)
-    }
-    // Front camera doesn't support torch — disable when switching to front
-    LaunchedEffect(useFrontCamera) {
-        if (useFrontCamera) torchEnabled = false
-    }
-
-    LaunchedEffect(productMode) {
-        if (productMode) {
-            inferenceMode = InferenceMode.ON_DEVICE
-            selectedModel = SignModel.BASELINE
-        }
-    }
-
-    overlayEnabledGate.set(showHandOverlay && !performanceMode)
-    faceEnabledGate.set(showFaceOverlay && !performanceMode)
-
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        hasPermission = granted
-        statusText = if (granted) {
-            "Camera permission granted. Initializing translator..."
-        } else {
-            "Camera permission denied."
-        }
-    }
-
-    suspend fun refreshBackendHealth(updateStatusText: Boolean): Boolean {
-        if (activeBackendUrl.isBlank()) {
-            isBackendReachable = false
-            isBackendChecking = false
-            backendConnectionMessage = "Set and save a backend URL first."
-            if (updateStatusText && inferenceMode == InferenceMode.BACKEND_LANDMARKS) {
-                statusText = "Backend mode needs a reachable server before recording."
-            }
-            return false
+    DisposableEffect(hasCameraPermission, useFrontCamera) {
+        if (!hasCameraPermission) {
+            return@DisposableEffect onDispose { }
         }
 
-        isBackendChecking = true
-        backendConnectionMessage = "Checking backend health..."
-        val connected = withContext(Dispatchers.IO) {
-            backendClient.checkHealth(activeBackendUrl)
-        }
-        isBackendChecking = false
-        isBackendReachable = connected
-        backendConnectionMessage = if (connected) {
-            "Backend reachable at $activeBackendUrl"
-        } else {
-            "Backend unreachable from phone"
-        }
-
-        if (updateStatusText && inferenceMode == InferenceMode.BACKEND_LANDMARKS) {
-            statusText = if (connected) {
-                "Backend connected. Press Record."
-            } else {
-                "Backend health check failed. Verify the URL and server."
-            }
-        }
-        return connected
-    }
-
-    suspend fun applyBackendUrl() {
-        val normalized = try {
-            validateAndNormalizeBackendUrl(backendUrlInput)
-        } catch (error: IllegalArgumentException) {
-            backendUrlError = error.message ?: "Enter a valid backend URL."
-            isBackendReachable = false
-            backendConnectionMessage = null
-            return
-        }
-
-        backendUrlError = null
-        backendUrlInput = normalized
-        activeBackendUrl = normalized
-        withContext(Dispatchers.IO) {
-            backendSettingsRepository.saveBackendBaseUrl(normalized)
-        }
-        refreshBackendHealth(updateStatusText = inferenceMode == InferenceMode.BACKEND_LANDMARKS)
-    }
-
-    fun stopRecording() {
-        isRecording = false
-        recordingGate.set(false)
-        lastProcessedFrameNs.set(0L)
-        overlayHands = emptyList()
-        overlayFace = null
-        roundTripMs = null
-        requestInFlight = false
-        lastObservedCommitCount = 0
-    }
-
-    suspend fun startRecording() {
-        if (!isModelReady) {
-            statusText = "Pipeline not ready yet. Please wait..."
-            return
-        }
-
-        if (inferenceMode == InferenceMode.BACKEND_LANDMARKS) {
-            val connected = refreshBackendHealth(updateStatusText = true)
-            if (!connected) {
-                return
-            }
-        }
-
-        liveEngineRef.get()?.resetCapture(clearTranscript = false)
-        predictedText = "--"
-        confidence = 0f
-        stability = 0f
-        inferenceMs = 0L
-        roundTripMs = null
-        requestInFlight = false
-        capturedFrameCount = 0
-        overlayHands = emptyList()
-        overlayFace = null
-        lastProcessedFrameNs.set(0L)
-        isRecording = true
-        recordingGate.set(true)
-        statusText = when (inferenceMode) {
-            InferenceMode.ON_DEVICE -> {
-                if (performanceMode) {
-                    "Recording started at $targetCaptureFps FPS (speed mode)."
-                } else {
-                    "Recording started at $targetCaptureFps FPS."
+        val disposeCamera = bindCollectorCamera(
+            context = context.applicationContext,
+            lifecycleOwner = lifecycleOwner,
+            previewView = previewView,
+            analysisExecutor = analysisExecutor,
+            mainExecutor = mainExecutor,
+            useFrontCamera = useFrontCamera,
+            captureGate = captureGate,
+            lastAcceptedFrameNs = lastAcceptedFrameNs,
+            frameBuffer = frameBuffer,
+            frameBufferLock = frameBufferLock,
+            onCameraReady = {
+                statusText = "Camera ready. Choose a sign and record."
+            },
+            onFrame = { frameCount, hasHand, hands, snapshot ->
+                recordedFrames = frameCount
+                if (hasHand) {
+                    detectedFrames += 1
                 }
-            }
-            InferenceMode.BACKEND_LANDMARKS -> {
-                "Recording started at $targetCaptureFps FPS. Sending landmarks to backend."
-            }
-        }
-    }
-
-    fun shutdownSession() {
-        stopRecording()
-        modelReadyGate.set(false)
-        isModelReady = false
-        isModelLoading = false
-        cameraProvider?.unbindAll()
-        liveEngineRef.getAndSet(null)?.close()
-    }
-
-    fun bindLivePipeline(
-        mode: InferenceMode,
-        model: SignModel,
-        performanceModeEnabled: Boolean,
-        quantizedEnabled: Boolean,
-        backendBaseUrl: String,
-        frontCamera: Boolean = true
-    ) {
-        val sessionId = sessionCounter.incrementAndGet()
-        stopRecording()
-        modelReadyGate.set(false)
-        isModelReady = false
-        isModelLoading = true
-        val modelVariantText = if (quantizedEnabled && mode == InferenceMode.ON_DEVICE) {
-            "quantized"
-        } else {
-            "standard"
-        }
-        statusText = when (mode) {
-            InferenceMode.ON_DEVICE -> "Loading ${model.displayName} ($modelVariantText) model..."
-            InferenceMode.BACKEND_LANDMARKS -> "Initializing backend landmark pipeline..."
-        }
-        predictedText = "--"
-        confidence = 0f
-        stability = 0f
-        inferenceMs = 0L
-        roundTripMs = null
-        requestInFlight = false
-        bufferCount = 0
-        transcript = ""
-        overlayHands = emptyList()
-        overlayFace = null
-        capturedFrameCount = 0
-        lastProcessedFrameNs.set(0L)
-        lastObservedCommitCount = 0
-
-        val providerFuture = ProcessCameraProvider.getInstance(context)
-        providerFuture.addListener(
-            {
-                try {
-                    val provider = providerFuture.get()
-                    cameraProvider = provider
-                    provider.unbindAll()
-                    liveEngineRef.getAndSet(null)?.close()
-
-                    val previewUseCase = Preview.Builder().build().also { preview ->
-                        preview.surfaceProvider = previewView.surfaceProvider
-                    }
-                    val analysisResolution = if (performanceModeEnabled) {
-                        if (mode == InferenceMode.BACKEND_LANDMARKS) {
-                            Size(256, 192)
-                        } else {
-                            Size(320, 240)
-                        }
+                overlayHands = hands
+                if (snapshot != null) {
+                    val action = normalizeActionName(actionText)
+                    if (autoContinue) {
+                        saveFrames(
+                            action = action,
+                            frames = snapshot,
+                            continueAfterSave = true
+                        )
                     } else {
-                        Size(640, 480)
+                        capturedFrames = snapshot
+                        phase = CapturePhase.Captured
+                        statusText = "Captured $SEQUENCE_LENGTH frames. Save or retake."
                     }
-                    val analysisUseCase = ImageAnalysis.Builder()
-                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                        .setTargetResolution(analysisResolution)
-                        .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
-                        .build()
-
-                    analysisUseCase.setAnalyzer(analysisExecutor) { imageProxy ->
-                        if (!recordingGate.get() || !modelReadyGate.get()) {
-                            imageProxy.close()
-                            return@setAnalyzer
-                        }
-
-                        val targetFps = targetFpsGate.get().coerceAtLeast(1)
-                        val frameTimestampNs = imageProxy.imageInfo.timestamp
-                        val minFrameIntervalNs = 1_000_000_000L / targetFps.toLong()
-                        val previousTimestampNs = lastProcessedFrameNs.get()
-                        if (previousTimestampNs > 0L &&
-                            frameTimestampNs > previousTimestampNs &&
-                            frameTimestampNs - previousTimestampNs < minFrameIntervalNs
-                        ) {
-                            imageProxy.close()
-                            return@setAnalyzer
-                        }
-                        lastProcessedFrameNs.set(frameTimestampNs)
-
-                        try {
-                            val engine = liveEngineRef.get() ?: return@setAnalyzer
-                            val liveState = engine.process(
-                                imageProxy = imageProxy,
-                                includeOverlay = overlayEnabledGate.get(),
-                                includeFace = faceEnabledGate.get()
-                            )
-                            mainExecutor.execute {
-                                if (sessionCounter.get() != sessionId) {
-                                    return@execute
-                                }
-                                capturedFrameCount += 1
-                                bufferCount = liveState.bufferCount
-                                sequenceLength = liveState.sequenceLength
-                                handsInFrame = liveState.handsInFrame
-                                fps = liveState.fps
-                                predictedText = liveState.displayedLabel
-                                confidence = liveState.displayedConfidence.coerceIn(0f, 1f)
-                                stability = liveState.stability.coerceIn(0f, 1f)
-                                transcript = liveState.transcript
-                                overlayHands = liveState.overlayHands
-                                overlayFace = liveState.overlayFace
-                                roundTripMs = liveState.roundTripMs
-                                requestInFlight = liveState.requestInFlight
-
-                                if (liveState.commitCount > lastObservedCommitCount) {
-                                    lastObservedCommitCount = liveState.commitCount
-                                    val committedWord = liveState.lastCommittedLabel
-                                        ?: liveState.displayedLabel
-                                    if (committedWord.isNotBlank() && committedWord != "--") {
-                                        onWordCommitted(
-                                            committedWord,
-                                            liveState.displayedConfidence,
-                                            selectedModel,
-                                            Instant.now().toString()
-                                        )
-                                    }
-
-                                    // ── Trigger Gemini sentence formation ────
-                                    if (sentenceModeEnabled && liveState.commitCount >= sentenceWordThreshold) {
-                                        val currentWords = liveState.transcript
-                                            .split(" ")
-                                            .filter { it.isNotBlank() }
-                                        val requestVersion = ++sentenceRequestVersion
-                                        sentenceDebounceJob?.cancel()
-                                        sentenceDebounceJob = coroutineScope.launch {
-                                            delay(800L)
-                                            isSentenceLoading = true
-                                            sentenceError = false
-
-                                            val result = geminiSentenceFormer.formSentence(
-                                                words = currentWords,
-                                                language = sentenceLanguage
-                                            )
-
-                                            if (requestVersion == sentenceRequestVersion) {
-                                                formedSentence = result.formedSentence
-                                                sentenceError = result.isError
-                                                sentenceErrorMessage = result.errorMessage
-                                                isSentenceLoading = false
-                                            }
-                                        }
-                                    }
-                                }
-
-                                liveState.rawPrediction?.let { prediction ->
-                                    inferenceMs = prediction.processingTimeMs
-                                }
-
-                                statusText = when {
-                                    !liveState.errorMessage.isNullOrBlank() -> liveState.errorMessage
-                                    liveState.rawPrediction != null &&
-                                        mode == InferenceMode.BACKEND_LANDMARKS &&
-                                        liveState.requestInFlight ->
-                                        "Recording at ${targetFpsGate.get()} FPS. Backend request in flight..."
-                                    liveState.rawPrediction != null &&
-                                        mode == InferenceMode.BACKEND_LANDMARKS ->
-                                        "Recording at ${targetFpsGate.get()} FPS and predicting on backend..."
-                                    liveState.rawPrediction != null ->
-                                        "Recording at ${targetFpsGate.get()} FPS and predicting..."
-                                    liveState.requestInFlight &&
-                                        mode == InferenceMode.BACKEND_LANDMARKS ->
-                                        "Sending landmarks to backend..."
-                                    else ->
-                                        "Collecting landmarks (${liveState.bufferCount}/${liveState.sequenceLength})"
-                                }
-                            }
-                        } catch (error: Exception) {
-                            mainExecutor.execute {
-                                if (sessionCounter.get() != sessionId) {
-                                    return@execute
-                                }
-                                statusText = error.message ?: "Live inference error."
-                            }
-                        } finally {
-                            imageProxy.close()
-                        }
-                    }
-
-                    val cameraSelector = if (frontCamera) {
-                        CameraSelector.DEFAULT_FRONT_CAMERA
-                    } else {
-                        CameraSelector.DEFAULT_BACK_CAMERA
-                    }
-                    val boundCamera = provider.bindToLifecycle(
-                        lifecycleOwner,
-                        cameraSelector,
-                        previewUseCase,
-                        analysisUseCase
-                    )
-                    activeCameraRef.set(boundCamera)
-                    // Apply torch state immediately after binding
-                    boundCamera.cameraControl.enableTorch(torchEnabled)
-
-                    modelLoadExecutor.execute {
-                        try {
-                            val engine: StreamingSignEngine = when (mode) {
-                                InferenceMode.ON_DEVICE -> LiveSignEngine(
-                                    context = context,
-                                    model = model,
-                                    useQuantizedModel = quantizedEnabled
-                                )
-                                InferenceMode.BACKEND_LANDMARKS -> BackendLiveSignEngine(
-                                    context = context,
-                                    baseUrl = backendBaseUrl,
-                                    model = model
-                                )
-                            }
-                            engine.warmUp()
-                            mainExecutor.execute {
-                                if (sessionCounter.get() != sessionId) {
-                                    engine.close()
-                                    return@execute
-                                }
-                                liveEngineRef.getAndSet(engine)?.close()
-                                modelReadyGate.set(true)
-                                isModelLoading = false
-                                isModelReady = true
-                                statusText = when (mode) {
-                                    InferenceMode.ON_DEVICE -> {
-                                        val readyVariantText = if (quantizedEnabled) {
-                                            "Quantized"
-                                        } else {
-                                            "Standard"
-                                        }
-                                        if (performanceModeEnabled) {
-                                            "$readyVariantText model ready in speed mode (${analysisResolution.width}x${analysisResolution.height}). Press Record."
-                                        } else {
-                                            "$readyVariantText model ready. Set FPS and press Record."
-                                        }
-                                    }
-                                    InferenceMode.BACKEND_LANDMARKS -> {
-                                        if (backendBaseUrl.isBlank()) {
-                                            "Backend pipeline ready. Set backend URL and check health."
-                                        } else {
-                                            "Backend pipeline ready. Check health before recording."
-                                        }
-                                    }
-                                }
-                            }
-                        } catch (error: Exception) {
-                            mainExecutor.execute {
-                                if (sessionCounter.get() != sessionId) {
-                                    return@execute
-                                }
-                                modelReadyGate.set(false)
-                                isModelLoading = false
-                                isModelReady = false
-                                statusText = error.message ?: "Failed to load pipeline."
-                            }
-                        }
-                    }
-                } catch (error: Exception) {
-                    isModelLoading = false
-                    isModelReady = false
-                    modelReadyGate.set(false)
-                    statusText = error.message ?: "Failed to start camera."
                 }
             },
-            mainExecutor
+            onError = { message ->
+                captureGate.set(false)
+                phase = CapturePhase.Idle
+                statusText = message
+            }
         )
+
+        onDispose {
+            captureGate.set(false)
+            disposeCamera()
+        }
     }
 
     DisposableEffect(Unit) {
         onDispose {
-            shutdownSession()
+            countdownJob?.cancel()
+            captureGate.set(false)
             analysisExecutor.shutdown()
-            modelLoadExecutor.shutdown()
         }
     }
 
     LaunchedEffect(Unit) {
-        val savedBackendUrl = backendSettingsRepository.backendBaseUrlFlow.first()
-        backendUrlInput = savedBackendUrl
-        activeBackendUrl = savedBackendUrl
-        didLoadSavedBackendUrl = true
-        if (savedBackendUrl.isNotBlank()) {
-            refreshBackendHealth(updateStatusText = false)
+        if (!hasCameraPermission) {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
-        sentenceModeEnabled = backendSettingsRepository.sentenceModeEnabledFlow.first()
-        // Restore previously chosen output language (persisted across sessions)
-        sentenceLanguage = backendSettingsRepository.sentenceLanguageFlow.first()
     }
 
-    LaunchedEffect(hasPermission, inferenceMode, selectedModel, performanceMode, useQuantizedModel, activeBackendUrl, useFrontCamera) {
-        if (hasPermission) {
-            bindLivePipeline(
-                mode = inferenceMode,
-                model = selectedModel,
-                performanceModeEnabled = performanceMode,
-                quantizedEnabled = inferenceMode == InferenceMode.ON_DEVICE && useQuantizedModel,
-                backendBaseUrl = activeBackendUrl,
-                frontCamera = useFrontCamera
+    CollectorScreen(
+        hasCameraPermission = hasCameraPermission,
+        actionText = actionText,
+        selectedAction = selectedAction,
+        suggestedActions = suggestedActions,
+        selectedActionCount = selectedActionCount,
+        phase = phase,
+        countdown = countdown,
+        recordedFrames = recordedFrames,
+        detectedFrames = detectedFrames,
+        lastExportPath = lastExportPath,
+        statusText = statusText,
+        useFrontCamera = useFrontCamera,
+        autoContinue = autoContinue,
+        previewView = previewView,
+        overlayHands = overlayHands,
+        onActionTextChange = { actionText = it },
+        onActionSelected = { actionText = it },
+        onAddAction = ::addCurrentAction,
+        onAutoContinueChange = { enabled ->
+            autoContinue = enabled
+            statsStore.saveAutoContinue(enabled)
+            statusText = if (enabled) {
+                "Auto continue enabled."
+            } else {
+                "Auto continue disabled."
+            }
+        },
+        onRequestCameraPermission = {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+        },
+        onToggleCamera = {
+            useFrontCamera = !useFrontCamera
+            resetCaptureState("Camera switched. Ready for another sample.")
+        },
+        onStartCapture = ::startCapture,
+        onStopCapture = ::stopCapture,
+        onRetake = ::startCapture,
+        onSave = ::saveCapturedSample
+    )
+}
+
+@Composable
+private fun CollectorScreen(
+    hasCameraPermission: Boolean,
+    actionText: String,
+    selectedAction: String,
+    suggestedActions: List<String>,
+    selectedActionCount: Int,
+    phase: CapturePhase,
+    countdown: Int,
+    recordedFrames: Int,
+    detectedFrames: Int,
+    lastExportPath: String?,
+    statusText: String,
+    useFrontCamera: Boolean,
+    autoContinue: Boolean,
+    previewView: PreviewView,
+    overlayHands: List<HandWireframe>,
+    onActionTextChange: (String) -> Unit,
+    onActionSelected: (String) -> Unit,
+    onAddAction: () -> Unit,
+    onAutoContinueChange: (Boolean) -> Unit,
+    onRequestCameraPermission: () -> Unit,
+    onToggleCamera: () -> Unit,
+    onStartCapture: () -> Unit,
+    onStopCapture: () -> Unit,
+    onRetake: () -> Unit,
+    onSave: () -> Unit
+) {
+    Scaffold(
+        containerColor = Color.Transparent,
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFFF5FAF1),
+                        Color(0xFFE8F1E7),
+                        Color(0xFFF8F4E3)
+                    )
+                )
+            )
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 18.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            HeaderSection()
+
+            CameraPanel(
+                hasCameraPermission = hasCameraPermission,
+                previewView = previewView,
+                overlayHands = overlayHands,
+                mirrorOverlayHorizontally = useFrontCamera,
+                phase = phase,
+                countdown = countdown,
+                recordedFrames = recordedFrames,
+                onRequestCameraPermission = onRequestCameraPermission
+            )
+
+            ControlPanel(
+                actionText = actionText,
+                selectedAction = selectedAction,
+                suggestedActions = suggestedActions,
+                selectedActionCount = selectedActionCount,
+                phase = phase,
+                recordedFrames = recordedFrames,
+                detectedFrames = detectedFrames,
+                statusText = statusText,
+                lastExportPath = lastExportPath,
+                useFrontCamera = useFrontCamera,
+                autoContinue = autoContinue,
+                onActionTextChange = onActionTextChange,
+                onActionSelected = onActionSelected,
+                onAddAction = onAddAction,
+                onAutoContinueChange = onAutoContinueChange,
+                onToggleCamera = onToggleCamera,
+                onStartCapture = onStartCapture,
+                onStopCapture = onStopCapture,
+                onRetake = onRetake,
+                onSave = onSave
             )
         }
     }
+}
 
-    LaunchedEffect(inferenceMode, activeBackendUrl, didLoadSavedBackendUrl) {
-        if (!didLoadSavedBackendUrl) {
-            return@LaunchedEffect
-        }
-        if (inferenceMode == InferenceMode.BACKEND_LANDMARKS) {
-            if (activeBackendUrl.isBlank()) {
-                isBackendReachable = false
-                backendConnectionMessage = "Enter a backend URL to enable server inference."
-            } else {
-                refreshBackendHealth(updateStatusText = !isRecording)
-            }
-        }
-    }
-
-    // Derived state
-    val readyIndicatorColor = when {
-        isModelLoading || isBackendChecking -> Color(0xFFF59E0B)
-        inferenceMode == InferenceMode.BACKEND_LANDMARKS && isModelReady && isBackendReachable -> Color(0xFF58CC02)
-        inferenceMode == InferenceMode.BACKEND_LANDMARKS && isModelReady -> Color(0xFF0EA5E9)
-        isModelReady -> Color(0xFF58CC02)
-        else -> Color(0xFF94A3B8)
-    }
-    val canStartRecording = if (isRecording) true else {
-        hasPermission && isModelReady && !isModelLoading &&
-            (inferenceMode == InferenceMode.ON_DEVICE || (isBackendReachable && !isBackendChecking))
-    }
-    val currentDrawerModelOptionsContent by rememberUpdatedState<(@Composable () -> Unit)?>(
-        {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // ── Output Language toggle (visible in all modes) ─────────────
-                SettingsSectionLabel("Output Language")
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    CameraOptionChip(
-                        label = "English",
-                        selected = sentenceLanguage == SentenceLanguage.ENGLISH,
-                        modifier = Modifier.weight(1f),
-                        onClick = {
-                            sentenceLanguage = SentenceLanguage.ENGLISH
-                            coroutineScope.launch {
-                                backendSettingsRepository.saveSentenceLanguage(SentenceLanguage.ENGLISH)
-                            }
-                        }
-                    )
-                    CameraOptionChip(
-                        label = "اردو",
-                        selected = sentenceLanguage == SentenceLanguage.URDU,
-                        modifier = Modifier.weight(1f),
-                        onClick = {
-                            sentenceLanguage = SentenceLanguage.URDU
-                            coroutineScope.launch {
-                                backendSettingsRepository.saveSentenceLanguage(SentenceLanguage.URDU)
-                            }
-                        }
-                    )
-                    CameraOptionChip(
-                        label = "Both",
-                        selected = sentenceLanguage == SentenceLanguage.BOTH,
-                        modifier = Modifier.weight(1f),
-                        onClick = {
-                            sentenceLanguage = SentenceLanguage.BOTH
-                            coroutineScope.launch {
-                                backendSettingsRepository.saveSentenceLanguage(SentenceLanguage.BOTH)
-                            }
-                        }
-                    )
-                }
-
-                SettingsSectionLabel("Smart Sentences")
-                SettingsToggleRow(
-                    label = "AI Sentence Formation",
-                    description = "Use Gemini AI to form natural sentences from detected words",
-                    checked = sentenceModeEnabled,
-                    onCheckedChange = { enabled ->
-                        sentenceModeEnabled = enabled
-                        coroutineScope.launch {
-                            backendSettingsRepository.saveSentenceModeEnabled(enabled)
-                        }
-                        if (!enabled) {
-                            formedSentence = ""
-                            isSentenceLoading = false
-                            sentenceDebounceJob?.cancel()
-                        }
-                    }
-                )
-                AnimatedVisibility(
-                    visible = sentenceModeEnabled,
-                    enter = expandVertically() + fadeIn(),
-                    exit = shrinkVertically() + fadeOut()
-                ) {
-                    Text(
-                        text = "When enabled, SignSpeak forms a sentence after at least $sentenceWordThreshold detected words.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF6B7280)
-                    )
-                }
-
-                // ── Advanced settings (dev / non-product mode only) ──────────
-                if (!productMode) {
-                    SettingsSectionLabel("Advanced")
-                    SettingsToggleRow(
-                        label = "Speed Mode",
-                        description = "Lower resolution for faster processing",
-                        checked = performanceMode,
-                        onCheckedChange = { performanceMode = it },
-                        enabled = !isModelLoading
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        CameraOptionChip(
-                            label = "On Device",
-                            selected = inferenceMode == InferenceMode.ON_DEVICE,
-                            modifier = Modifier.weight(1f),
-                            onClick = { inferenceMode = InferenceMode.ON_DEVICE }
-                        )
-                        CameraOptionChip(
-                            label = "Backend",
-                            selected = inferenceMode == InferenceMode.BACKEND_LANDMARKS,
-                            modifier = Modifier.weight(1f),
-                            onClick = { inferenceMode = InferenceMode.BACKEND_LANDMARKS }
-                        )
-                    }
-                    if (inferenceMode == InferenceMode.BACKEND_LANDMARKS) {
-                        OutlinedTextField(
-                            value = backendUrlInput,
-                            onValueChange = {
-                                backendUrlInput = it
-                                backendUrlError = null
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            enabled = !isRecording,
-                            label = { Text("Backend URL") },
-                            placeholder = { Text("http://192.168.x.x:8000") },
-                            isError = backendUrlError != null
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(
-                                onClick = { coroutineScope.launch { applyBackendUrl() } },
-                                enabled = !isRecording && !isBackendChecking,
-                                modifier = Modifier.weight(1f)
-                            ) { Text("Save") }
-                            Button(
-                                onClick = { coroutineScope.launch { refreshBackendHealth(true) } },
-                                enabled = activeBackendUrl.isNotBlank() && !isBackendChecking,
-                                modifier = Modifier.weight(1f)
-                            ) { Text(if (isBackendChecking) "Checking..." else "Health") }
-                        }
-                        backendConnectionMessage?.let { msg ->
-                            Text(
-                                text = msg,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (isBackendReachable) Color(0xFF16A34A) else Color(0xFFB91C1C)
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    )
-    SideEffect {
-        onModelOptionsContentChange(currentDrawerModelOptionsContent)
-    }
-    DisposableEffect(onModelOptionsContentChange) {
-        onDispose {
-            onModelOptionsContentChange(null)
-        }
-    }
-
-    // ── Root layout (white background, full screen) ───────────────────────────
+@Composable
+private fun HeaderSection() {
     Column(
         modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFF7FBF1)),
-        verticalArrangement = Arrangement.spacedBy(0.dp)
+            .fillMaxWidth()
+            .widthIn(max = 720.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
+        Text(
+            text = "SignSpeak Collector",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.ExtraBold,
+            color = Color(0xFF203017)
+        )
+        Text(
+            text = "$COLLECTION_FORMAT - mobile landmark samples",
+            style = MaterialTheme.typography.bodySmall,
+            color = Color(0xFF4F5E47)
+        )
+    }
+}
 
-        // ── Status bar (compact top chip) ─────────────────────────────────────
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            // Status pill
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .width(8.dp)
-                        .height(8.dp)
-                        .clip(CircleShape)
-                        .background(readyIndicatorColor)
-                )
-                Text(
-                    text = if (isModelLoading) "Loading model…"
-                           else if (isRecording) "Translating…"
-                           else if (isModelReady) "Ready"
-                           else "Initialising…",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF1A1A1A)
-                )
-            }
-            // Loading progress pill (only while loading)
-            if (isModelLoading || isBackendChecking) {
-                LinearProgressIndicator(
-                    progress = { if (isModelLoading) 0.4f else 0.8f },
-                    modifier = Modifier
-                        .width(80.dp)
-                        .height(6.dp)
-                        .clip(RoundedCornerShape(10.dp)),
-                    color = Color(0xFF58CC02),
-                    trackColor = Color(0xFFE2E8F0)
-                )
-            }
-        }
-
-        // ── Camera preview (takes most of the space) ──────────────────────────
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .padding(horizontal = 12.dp)
-                .clip(RoundedCornerShape(32.dp))
-                .background(Color(0xFF747C71))
-        ) {
-            if (hasPermission) {
+@Composable
+private fun CameraPanel(
+    hasCameraPermission: Boolean,
+    previewView: PreviewView,
+    overlayHands: List<HandWireframe>,
+    mirrorOverlayHorizontally: Boolean,
+    phase: CapturePhase,
+    countdown: Int,
+    recordedFrames: Int,
+    onRequestCameraPermission: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .widthIn(max = 720.dp)
+            .height(420.dp),
+        shape = RoundedCornerShape(8.dp),
+        tonalElevation = 2.dp,
+        shadowElevation = 6.dp,
+        color = Color(0xFF172012)
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (hasCameraPermission) {
                 AndroidView(
                     factory = { previewView },
                     modifier = Modifier.fillMaxSize()
                 )
-
-                // ── Hand wireframe overlay (recording only) ────────────────
-                if (isRecording && (overlayHands.isNotEmpty() || overlayFace != null)) {
-                    Canvas(modifier = Modifier.fillMaxSize()) {
-                        overlayHands.forEach { hand ->
-                            val color = when (hand.side) {
-                                HandSide.LEFT  -> Color(0xFF58CC02)
-                                HandSide.RIGHT -> Color(0xFFFFC800)
-                                HandSide.UNKNOWN -> Color(0xFF60A5FA)
-                            }
-                            val mappedPoints = hand.points.map { p ->
-                                Offset(((1f - p.x).coerceIn(0f, 1f)) * size.width,
-                                       p.y.coerceIn(0f, 1f) * size.height)
-                            }
-                            HAND_CONNECTIONS.forEach { (s, e) ->
-                                if (s < mappedPoints.size && e < mappedPoints.size) {
-                                    drawLine(color.copy(alpha = 0.9f), mappedPoints[s], mappedPoints[e], strokeWidth = 4f)
-                                }
-                            }
-                            mappedPoints.forEach { pt ->
-                                drawCircle(Color.White, radius = 5f, center = pt)
-                                drawCircle(color,      radius = 3f, center = pt)
-                            }
-                        }
-                    }
-                }
-
-                // ── Floating camera controls (top-right of preview) ────────
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    // Flip camera
-                    FilledTonalIconButton(
-                        onClick = { useFrontCamera = !useFrontCamera },
-                        colors = IconButtonDefaults.filledTonalIconButtonColors(
-                            containerColor = Color(0xF2FFFCF5),
-                            contentColor   = Color(0xFF1F5100)
-                        )
-                    ) {
-                        Icon(Icons.Rounded.Cameraswitch, contentDescription = "Flip camera")
-                    }
-
-                    // Torch control
-                    if (!useFrontCamera) {
-                        FilledTonalIconButton(
-                            onClick = { torchEnabled = !torchEnabled },
-                            colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                containerColor = if (torchEnabled) Color(0xFF58CC02) else Color(0xF2FFFCF5),
-                                contentColor   = if (torchEnabled) Color.White else Color(0xFF1F5100)
-                            )
-                        ) {
-                            Icon(
-                                if (torchEnabled) Icons.Rounded.FlashOn else Icons.Rounded.FlashOff,
-                                contentDescription = "Torch"
-                            )
-                        }
-                    }
-                }
-
-                // ── Prediction overlay (bottom of preview) ─────────────────
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(Color.Transparent, Color(0xE6080F1A))
-                            )
-                        )
-                        .padding(horizontal = 16.dp, vertical = 14.dp)
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = if (predictedText == "--") {
-                                    if (sentenceLanguage == SentenceLanguage.URDU) "انتظار کریں..." else "Waiting…"
-                                } else LabelTranslator.formatLabel(predictedText, sentenceLanguage),
-                                style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                modifier = Modifier.weight(1f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = if (confidence > 0f) "${(confidence * 100f).roundToInt()}%" else "",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF58CC02)
-                            )
-                        }
-
-                        // Confidence bar
-                        if (confidence > 0f) {
-                            LinearProgressIndicator(
-                                progress = { confidence.coerceIn(0f, 1f) },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(5.dp)
-                                    .clip(RoundedCornerShape(10.dp)),
-                                color = Color(0xFF58CC02),
-                                trackColor = Color(0x3358CC02)
-                            )
-                        }
-
-                        // Transcript row
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = if (transcript.isBlank()) "—" else LabelTranslator.formatTranscript(transcript, sentenceLanguage),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color(0xFFCCE5FF),
-                                modifier = Modifier.weight(1f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                if (transcript.isNotBlank()) {
-                                    TextButton(
-                                        onClick = {
-                                            liveEngineRef.get()?.clearTranscript()
-                                            transcript = ""
-                                            formedSentence = ""
-                                            sentenceError = false
-                                            sentenceErrorMessage = null
-                                            isSentenceLoading = false
-                                            sentenceDebounceJob?.cancel()
-                                            lastObservedCommitCount = 0
-                                        },
-                                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)
-                                    ) { Text("Clear", color = Color(0xFF94A3B8)) }
-                                }
-                                if (productMode && predictedText != "--") {
-                                    TextButton(
-                                        onClick = {
-                                            if (!isAuthenticated) onRequireAuth()
-                                            else onReportPrediction(predictedText, confidence, selectedModel)
-                                        },
-                                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)
-                                    ) { Text("Report", color = Color(0xFF94A3B8)) }
-                                }
-                            }
-                        }
-
-                        // ── Formed sentence card (Gemini) ──────────────────
-                        if (sentenceModeEnabled && (formedSentence.isNotBlank() || isSentenceLoading)) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 4.dp)
-                                    .background(
-                                        color = Color(0x33FFFFFF),
-                                        shape = RoundedCornerShape(12.dp)
-                                    )
-                                    .padding(horizontal = 10.dp, vertical = 8.dp)
-                            ) {
-                                if (isSentenceLoading) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        LinearProgressIndicator(
-                                            modifier = Modifier
-                                                .width(48.dp)
-                                                .height(3.dp)
-                                                .clip(RoundedCornerShape(10.dp)),
-                                            color = Color(0xFFFCD400),
-                                            trackColor = Color(0x33FFFFFF)
-                                        )
-                                        Text(
-                                            text = if (sentenceLanguage == SentenceLanguage.URDU) "جملہ بن رہا ہے..." else "Forming sentence…",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = Color(0xFFCCE5FF)
-                                        )
-                                    }
-                                } else {
-                                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(
-                                                text = "✨ AI Sentence",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontWeight = FontWeight.Bold,
-                                                color = Color(0xFFFCD400)
-                                            )
-                                            if (sentenceError) {
-                                                Text(
-                                                    text = "(fallback)",
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = Color(0xFF94A3B8)
-                                                )
-                                            }
-                                        }
-                                        Text(
-                                            text = formedSentence,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = FontWeight.Medium,
-                                            color = Color.White,
-                                            maxLines = 3,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        if (sentenceError) {
-                                            Text(
-                                                text = sentenceErrorMessage ?: "Gemini request failed.",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = Color(0xFFFFC4C4),
-                                                maxLines = 6,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                HandOverlay(
+                    hands = overlayHands,
+                    mirrorHorizontally = mirrorOverlayHorizontally,
+                    modifier = Modifier.fillMaxSize()
+                )
             } else {
-                // ── No permission state ────────────────────────────────────
                 Column(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(24.dp),
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("Camera access needed", color = Color.White, fontWeight = FontWeight.Bold)
-                    Button(
-                        onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) },
-                        modifier = Modifier.padding(top = 12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF58CC02))
-                    ) { Text("Grant Permission") }
-                }
-            }
-        } // end camera Box
-
-        // ── Record button ─────────────────────────────────────────────────────
-        Button(
-            onClick = {
-                coroutineScope.launch {
-                    if (isRecording) {
-                        stopRecording()
-                        statusText = "Recording stopped."
-                    } else {
-                        startRecording()
+                    Icon(
+                        imageVector = Icons.Rounded.CameraAlt,
+                        contentDescription = null,
+                        tint = Color(0xFFFFD84D),
+                        modifier = Modifier.size(44.dp)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Camera permission required",
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(onClick = onRequestCameraPermission) {
+                        Text("Grant Camera")
                     }
                 }
-            },
-            enabled = canStartRecording,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp)
-                .height(56.dp),
-            shape = RoundedCornerShape(18.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = if (isRecording) Color(0xFFFF4B4B) else Color(0xFF58CC02),
-                contentColor = Color.White,
-                disabledContainerColor = Color(0xFFD1D5DB),
-                disabledContentColor = Color(0xFF9CA3AF)
-            )
-        ) {
-            Text(
-                text = if (isRecording) "⏹  Stop" else "⏺  Start Translating",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
+            }
+
+            if (phase == CapturePhase.Countdown) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.42f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = countdown.toString(),
+                        style = MaterialTheme.typography.displayLarge,
+                        color = Color.White,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                }
+            }
+
+            AssistChip(
+                onClick = { },
+                label = {
+                    Text(
+                        text = when (phase) {
+                            CapturePhase.Recording -> "$recordedFrames / $SEQUENCE_LENGTH"
+                            CapturePhase.Captured -> "Sample ready"
+                            CapturePhase.Saving -> "Saving"
+                            CapturePhase.Countdown -> "Starting"
+                            CapturePhase.Idle -> "Ready"
+                        }
+                    )
+                },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(12.dp)
             )
         }
+    }
+}
 
-        // ── Expandable Settings panel ─────────────────────────────────────────
-        if (false) {
-            Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .padding(bottom = 12.dp),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFFF0F5EB)),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+@Composable
+private fun ControlPanel(
+    actionText: String,
+    selectedAction: String,
+    suggestedActions: List<String>,
+    selectedActionCount: Int,
+    phase: CapturePhase,
+    recordedFrames: Int,
+    detectedFrames: Int,
+    statusText: String,
+    lastExportPath: String?,
+    useFrontCamera: Boolean,
+    autoContinue: Boolean,
+    onActionTextChange: (String) -> Unit,
+    onActionSelected: (String) -> Unit,
+    onAddAction: () -> Unit,
+    onAutoContinueChange: (Boolean) -> Unit,
+    onToggleCamera: () -> Unit,
+    onStartCapture: () -> Unit,
+    onStopCapture: () -> Unit,
+    onRetake: () -> Unit,
+    onSave: () -> Unit
+) {
+    var showWordList by remember { mutableStateOf(false) }
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .widthIn(max = 720.dp),
+        shape = RoundedCornerShape(8.dp),
+        color = Color.White.copy(alpha = 0.94f),
+        tonalElevation = 1.dp,
+        shadowElevation = 3.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Column {
-                // Settings header row (tap to expand/collapse)
+            OutlinedTextField(
+                value = actionText,
+                onValueChange = onActionTextChange,
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text("Action") },
+                supportingText = {
+                    val nextSequence = selectedActionCount + 1
+                    Text("Saved on this phone: $selectedActionCount - next phone sample: $nextSequence")
+                },
+                enabled = phase == CapturePhase.Idle
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedButton(
+                    onClick = onAddAction,
+                    enabled = phase == CapturePhase.Idle && selectedAction.isNotBlank(),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Add Word")
+                }
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.weight(1.2f),
+                    horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(Icons.Rounded.Settings, contentDescription = null, tint = Color(0xFF58CC02))
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text(
-                                "Model Options",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color(0xFF1A1A1A)
-                            )
-                            Text(
-                                "Choose translation model",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color(0xFF6B7280)
-                            )
-                        }
-                    }
-                    IconButton(onClick = { settingsExpanded = !settingsExpanded }) {
-                        Icon(
-                            if (settingsExpanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
-                            contentDescription = if (settingsExpanded) "Collapse" else "Expand",
-                            tint = Color(0xFF64748B)
-                        )
-                    }
+                    Text(
+                        text = "Auto continue",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Color(0xFF33402C)
+                    )
+                    Spacer(modifier = Modifier.size(8.dp))
+                    Switch(
+                        checked = autoContinue,
+                        onCheckedChange = onAutoContinueChange,
+                        enabled = phase == CapturePhase.Idle || phase == CapturePhase.Captured
+                    )
                 }
+            }
 
-                // Collapsible content
-                AnimatedVisibility(
-                    visible = settingsExpanded,
-                    enter = expandVertically() + fadeIn(),
-                    exit  = shrinkVertically() + fadeOut()
+            if (suggestedActions.isNotEmpty()) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(0xFFF4F6ED)
                 ) {
                     Column(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 0.dp).padding(bottom = 14.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-
-                        // ── Camera section ─────────────────────────────────
-                        if (false) {
-                            SettingsSectionLabel("Camera")
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            CameraOptionChip(
-                                label = "Front",
-                                selected = useFrontCamera,
-                                modifier = Modifier.weight(1f),
-                                onClick = { useFrontCamera = true }
-                            )
-                            CameraOptionChip(
-                                label = "Back",
-                                selected = !useFrontCamera,
-                                modifier = Modifier.weight(1f),
-                                onClick = { useFrontCamera = false }
-                            )
-                        }
-                        if (!useFrontCamera) {
-                            SettingsToggleRow(
-                                label = "Flashlight",
-                                description = "Turn on torch for better lighting",
-                                checked = torchEnabled,
-                                onCheckedChange = { torchEnabled = it }
-                            )
-                        }
-                        }
-
-                        // ── Smart Sentences section ─────────────────────────
-                        SettingsSectionLabel("Smart Sentences")
-                        SettingsToggleRow(
-                            label = "AI Sentence Formation",
-                            description = "Use Gemini AI to form natural sentences from detected words",
-                            checked = sentenceModeEnabled,
-                            onCheckedChange = { enabled ->
-                                sentenceModeEnabled = enabled
-                                coroutineScope.launch {
-                                    backendSettingsRepository.saveSentenceModeEnabled(enabled)
-                                }
-                                if (!enabled) {
-                            formedSentence = ""
-                            isSentenceLoading = false
-                            sentenceError = false
-                            sentenceErrorMessage = null
-                            sentenceDebounceJob?.cancel()
-                        }
-                            }
-                        )
-                        AnimatedVisibility(
-                            visible = sentenceModeEnabled,
-                            enter = expandVertically() + fadeIn(),
-                            exit = shrinkVertically() + fadeOut()
-                        ) {
-                            Column(
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Output Language",
+                                    text = "Words",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = Color(0xFF33402C),
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "${suggestedActions.size} saved words",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = Color(0xFF6B7280)
+                                    color = Color(0xFF66715D)
                                 )
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    SentenceLanguage.entries.forEach { lang ->
-                                        CameraOptionChip(
-                                            label = lang.displayName,
-                                            selected = sentenceLanguage == lang,
-                                            modifier = Modifier.weight(1f),
-                                            onClick = {
-                                                sentenceLanguage = lang
-                                                coroutineScope.launch {
-                                                    backendSettingsRepository.saveSentenceLanguage(lang)
-                                                }
-                                                // Re-trigger sentence with new language if we have words
-                                                if (formedSentence.isNotBlank()) {
-                                                    val currentWords = transcript
-                                                        .split(" ")
-                                                        .filter { it.isNotBlank() }
-                                                    if (currentWords.size >= sentenceWordThreshold) {
-                                                        val requestVersion = ++sentenceRequestVersion
-                                                        sentenceDebounceJob?.cancel()
-                                                        sentenceDebounceJob = coroutineScope.launch {
-                                                            isSentenceLoading = true
-                                                            sentenceError = false
-                                                            val result = geminiSentenceFormer.formSentence(
-                                                                words = currentWords,
-                                                                language = lang
-                                                            )
-                                                            if (requestVersion == sentenceRequestVersion) {
-                                                                formedSentence = result.formedSentence
-                                                                sentenceError = result.isError
-                                                                sentenceErrorMessage = result.errorMessage
-                                                                isSentenceLoading = false
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        )
-                                    }
-                                }
                             }
-                        }
-
-                        // ── Model quality section ──────────────────────────
-                        SettingsSectionLabel("Model Quality")
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            CameraOptionChip(
-                                label = "Augmented",
-                                selected = selectedModel == SignModel.AUGMENTED,
-                                modifier = Modifier.weight(1f),
-                                onClick = { if (selectedModel != SignModel.AUGMENTED) selectedModel = SignModel.AUGMENTED }
-                            )
-                            CameraOptionChip(
-                                label = "Baseline",
-                                selected = selectedModel == SignModel.BASELINE,
-                                modifier = Modifier.weight(1f),
-                                onClick = { if (selectedModel != SignModel.BASELINE) selectedModel = SignModel.BASELINE }
-                            )
-                        }
-
-                        // ── Capture speed section ──────────────────────────
-                        if (false) {
-                            SettingsSectionLabel("Capture Speed — $targetCaptureFps FPS")
-                        Slider(
-                            value = targetCaptureFps.toFloat(),
-                            onValueChange = { rawValue ->
-                                val adjusted = rawValue.roundToInt().coerceIn(5, 60)
-                                targetCaptureFps = adjusted
-                                targetFpsGate.set(adjusted)
-                            },
-                            valueRange = 5f..60f,
-                            steps = 10,
-                            enabled = !isModelLoading,
-                            colors = SliderDefaults.colors(
-                                thumbColor = Color(0xFF58CC02),
-                                activeTrackColor = Color(0xFF58CC02),
-                                inactiveTrackColor = Color(0xFFE2E8F0)
-                            )
-                        )
-                        }
-
-                        // ── Dev-only section (non-product mode) ───────────
-                        if (!productMode) {
-                            SettingsSectionLabel("Advanced")
-                            SettingsToggleRow(
-                                label = "Speed Mode",
-                                description = "Lower resolution for faster processing",
-                                checked = performanceMode,
-                                onCheckedChange = { performanceMode = it },
-                                enabled = !isModelLoading
-                            )
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            IconButton(
+                                onClick = { showWordList = !showWordList },
+                                enabled = phase == CapturePhase.Idle
                             ) {
-                                CameraOptionChip(
-                                    label = "On Device",
-                                    selected = inferenceMode == InferenceMode.ON_DEVICE,
-                                    modifier = Modifier.weight(1f),
-                                    onClick = { inferenceMode = InferenceMode.ON_DEVICE }
-                                )
-                                CameraOptionChip(
-                                    label = "Backend",
-                                    selected = inferenceMode == InferenceMode.BACKEND_LANDMARKS,
-                                    modifier = Modifier.weight(1f),
-                                    onClick = { inferenceMode = InferenceMode.BACKEND_LANDMARKS }
+                                Icon(
+                                    imageVector = if (showWordList) {
+                                        Icons.Rounded.ExpandLess
+                                    } else {
+                                        Icons.Rounded.ExpandMore
+                                    },
+                                    contentDescription = if (showWordList) {
+                                        "Collapse words"
+                                    } else {
+                                        "Show words"
+                                    }
                                 )
                             }
-                            if (inferenceMode == InferenceMode.BACKEND_LANDMARKS) {
-                                OutlinedTextField(
-                                    value = backendUrlInput,
-                                    onValueChange = { backendUrlInput = it; backendUrlError = null },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    singleLine = true,
-                                    enabled = !isRecording,
-                                    label = { Text("Backend URL") },
-                                    placeholder = { Text("http://192.168.x.x:8000") },
-                                    isError = backendUrlError != null
-                                )
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Button(
-                                        onClick = { coroutineScope.launch { applyBackendUrl() } },
-                                        enabled = !isRecording && !isBackendChecking,
-                                        modifier = Modifier.weight(1f)
-                                    ) { Text("Save") }
-                                    Button(
-                                        onClick = { coroutineScope.launch { refreshBackendHealth(true) } },
-                                        enabled = activeBackendUrl.isNotBlank() && !isBackendChecking,
-                                        modifier = Modifier.weight(1f)
-                                    ) { Text(if (isBackendChecking) "Checking…" else "Health") }
-                                }
-                                backendConnectionMessage?.let { msg ->
-                                    Text(msg, style = MaterialTheme.typography.bodySmall,
-                                         color = if (isBackendReachable) Color(0xFF16A34A) else Color(0xFFB91C1C))
+                        }
+
+                        if (showWordList) {
+                            LazyVerticalGrid(
+                                columns = GridCells.Adaptive(minSize = 132.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(220.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                contentPadding = PaddingValues(bottom = 4.dp)
+                            ) {
+                                items(suggestedActions) { action ->
+                                    FilterChip(
+                                        selected = selectedAction == action,
+                                        onClick = {
+                                            onActionSelected(action)
+                                            showWordList = false
+                                        },
+                                        label = {
+                                            Text(
+                                                text = action.replace("_", " "),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        },
+                                        enabled = phase == CapturePhase.Idle
+                                    )
                                 }
                             }
+                        }
+                    }
+                }
+            }
+
+            LinearProgressIndicator(
+                progress = { (recordedFrames.toFloat() / SEQUENCE_LENGTH).coerceIn(0f, 1f) },
+                modifier = Modifier.fillMaxWidth(),
+                color = Color(0xFF2B6C00),
+                trackColor = Color(0xFFE5E7D8)
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                MetricTile(
+                    label = "Frames",
+                    value = "$recordedFrames/$SEQUENCE_LENGTH",
+                    modifier = Modifier.weight(1f)
+                )
+                MetricTile(
+                    label = "Detected",
+                    value = "$detectedFrames",
+                    modifier = Modifier.weight(1f)
+                )
+                MetricTile(
+                    label = "Camera",
+                    value = if (useFrontCamera) "Front" else "Back",
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Text(
+                text = statusText,
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color(0xFF33402C)
+            )
+
+            lastExportPath?.let { path ->
+                Text(
+                    text = path,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFF5F4E00)
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onToggleCamera,
+                    enabled = phase == CapturePhase.Idle,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Rounded.Cameraswitch, contentDescription = null)
+                    Spacer(modifier = Modifier.size(8.dp))
+                    Text("Camera")
+                }
+
+                when (phase) {
+                    CapturePhase.Recording, CapturePhase.Countdown -> {
+                        Button(
+                            onClick = onStopCapture,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFBA1A1A)),
+                            modifier = Modifier.weight(1.4f)
+                        ) {
+                            Icon(Icons.Rounded.Stop, contentDescription = null)
+                            Spacer(modifier = Modifier.size(8.dp))
+                            Text("Stop")
+                        }
+                    }
+                    CapturePhase.Captured -> {
+                        OutlinedButton(
+                            onClick = onRetake,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Rounded.Replay, contentDescription = null)
+                            Spacer(modifier = Modifier.size(8.dp))
+                            Text("Retake")
+                        }
+                        Button(
+                            onClick = onSave,
+                            modifier = Modifier.weight(1.25f)
+                        ) {
+                            Icon(Icons.Rounded.Save, contentDescription = null)
+                            Spacer(modifier = Modifier.size(8.dp))
+                            Text("Save Sample")
+                        }
+                    }
+                    CapturePhase.Saving -> {
+                        Button(
+                            onClick = { },
+                            enabled = false,
+                            modifier = Modifier.weight(1.4f)
+                        ) {
+                            Text("Saving")
+                        }
+                    }
+                    CapturePhase.Idle -> {
+                        Button(
+                            onClick = onStartCapture,
+                            enabled = selectedAction.isNotBlank(),
+                            modifier = Modifier.weight(1.4f)
+                        ) {
+                            Icon(Icons.Rounded.CameraAlt, contentDescription = null)
+                            Spacer(modifier = Modifier.size(8.dp))
+                            Text("Record Sample")
                         }
                     }
                 }
@@ -1489,84 +932,293 @@ fun LiveCameraScreen(
         }
     }
 }
-}
-
-// ── Helper composables ─────────────────────────────────────────────────────────
 
 @Composable
-private fun CameraOptionChip(
+private fun MetricTile(
     label: String,
-    selected: Boolean,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
+    value: String,
+    modifier: Modifier = Modifier
 ) {
-    Button(
-        onClick = onClick,
+    Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(20.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = if (selected) Color(0xFF58CC02) else Color(0xFFF7FBF1),
-            contentColor   = if (selected) Color.White else Color(0xFF1F2937)
-        ),
-        elevation = ButtonDefaults.buttonElevation(
-            defaultElevation = if (selected) 2.dp else 0.dp
-        )
+        shape = RoundedCornerShape(8.dp),
+        color = Color(0xFFF4F6ED)
     ) {
-        Text(
-            text = label,
-            style = androidx.compose.material3.MaterialTheme.typography.labelLarge,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
-        )
-    }
-}
-
-@Composable
-private fun SettingsSectionLabel(label: String) {
-    Text(
-        text = label,
-        style = androidx.compose.material3.MaterialTheme.typography.labelMedium,
-        fontWeight = FontWeight.SemiBold,
-        color = Color(0xFF6B7280)
-    )
-}
-
-@Composable
-private fun SettingsToggleRow(
-    label: String,
-    description: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    enabled: Boolean = true
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
+        Column(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
             Text(
                 text = label,
-                style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = Color(0xFF1A1A1A)
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFF66715D)
             )
             Text(
-                text = description,
-                style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
-                color = Color(0xFF6B7280)
+                text = value,
+                style = MaterialTheme.typography.titleSmall,
+                color = Color(0xFF203017),
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
-        Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            enabled = enabled,
-            colors = androidx.compose.material3.SwitchDefaults.colors(
-                checkedThumbColor = Color.White,
-                checkedTrackColor = Color(0xFF58CC02),
-                uncheckedThumbColor = Color.White,
-                uncheckedTrackColor = Color(0xFFE2E8D8)
-            )
-        )
     }
 }
 
+@Composable
+private fun HandOverlay(
+    hands: List<HandWireframe>,
+    mirrorHorizontally: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier) {
+        hands.forEach { hand ->
+            val points = hand.points
+            val color = when (hand.side) {
+                HandSide.LEFT -> Color(0xFF00C2A8)
+                HandSide.RIGHT -> Color(0xFFFFD84D)
+                HandSide.UNKNOWN -> Color.White
+            }
+            HAND_CONNECTIONS.forEach { (start, end) ->
+                val startPoint = points.getOrNull(start)
+                val endPoint = points.getOrNull(end)
+                if (startPoint != null && endPoint != null) {
+                    val startX = if (mirrorHorizontally) 1f - startPoint.x else startPoint.x
+                    val endX = if (mirrorHorizontally) 1f - endPoint.x else endPoint.x
+                    drawLine(
+                        color = color,
+                        start = Offset(startX * size.width, startPoint.y * size.height),
+                        end = Offset(endX * size.width, endPoint.y * size.height),
+                        strokeWidth = 4f,
+                        cap = StrokeCap.Round
+                    )
+                }
+            }
+            points.forEach { point ->
+                val x = if (mirrorHorizontally) 1f - point.x else point.x
+                drawCircle(
+                    color = color,
+                    radius = 5f,
+                    center = Offset(x * size.width, point.y * size.height)
+                )
+            }
+        }
+    }
+}
+
+@Suppress("DEPRECATION")
+private fun bindCollectorCamera(
+    context: Context,
+    lifecycleOwner: LifecycleOwner,
+    previewView: PreviewView,
+    analysisExecutor: ExecutorService,
+    mainExecutor: java.util.concurrent.Executor,
+    useFrontCamera: Boolean,
+    captureGate: AtomicBoolean,
+    lastAcceptedFrameNs: AtomicLong,
+    frameBuffer: MutableList<FloatArray>,
+    frameBufferLock: Any,
+    onCameraReady: () -> Unit,
+    onFrame: (frameCount: Int, hasHand: Boolean, hands: List<HandWireframe>, snapshot: List<FloatArray>?) -> Unit,
+    onError: (String) -> Unit
+): () -> Unit {
+    val disposed = AtomicBoolean(false)
+    var provider: ProcessCameraProvider? = null
+    var extractor: HandExtractor? = null
+    val providerFuture = ProcessCameraProvider.getInstance(context)
+
+    providerFuture.addListener(
+        {
+            if (disposed.get()) {
+                return@addListener
+            }
+            try {
+                val cameraProvider = providerFuture.get()
+                provider = cameraProvider
+                cameraProvider.unbindAll()
+
+                val handExtractor = HandExtractor(context)
+                extractor = handExtractor
+
+                val previewUseCase = Preview.Builder().build().also { preview ->
+                    preview.surfaceProvider = previewView.surfaceProvider
+                }
+                val analysisUseCase = ImageAnalysis.Builder()
+                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                    .setTargetResolution(Size(ANALYSIS_WIDTH, ANALYSIS_HEIGHT))
+                    .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
+                    .build()
+
+                analysisUseCase.setAnalyzer(analysisExecutor) { imageProxy ->
+                    if (!captureGate.get()) {
+                        imageProxy.close()
+                        return@setAnalyzer
+                    }
+
+                    val timestampNs = imageProxy.imageInfo.timestamp
+                    val minFrameIntervalNs = 1_000_000_000L / TARGET_FPS.toLong()
+                    val previousTimestampNs = lastAcceptedFrameNs.get()
+                    if (previousTimestampNs > 0L &&
+                        timestampNs > previousTimestampNs &&
+                        timestampNs - previousTimestampNs < minFrameIntervalNs
+                    ) {
+                        imageProxy.close()
+                        return@setAnalyzer
+                    }
+                    lastAcceptedFrameNs.set(timestampNs)
+
+                    try {
+                        val timestampMs = timestampNs / 1_000_000L
+                        val output = handExtractor.extractFromImageProxyWithOverlay(
+                            imageProxy = imageProxy,
+                            timestampMs = timestampMs,
+                            includeOverlay = true
+                        )
+                        val frameVector = output.vector.copyOf()
+                        val hasHand = frameVector.any { abs(it) > 0.000001f }
+                        var snapshot: List<FloatArray>? = null
+                        val frameCount = synchronized(frameBufferLock) {
+                            if (frameBuffer.size < SEQUENCE_LENGTH) {
+                                frameBuffer.add(frameVector)
+                            }
+                            if (frameBuffer.size == SEQUENCE_LENGTH) {
+                                captureGate.set(false)
+                                snapshot = frameBuffer.map { it.copyOf() }
+                            }
+                            frameBuffer.size
+                        }
+                        mainExecutor.execute {
+                            onFrame(frameCount, hasHand, output.hands, snapshot)
+                        }
+                    } catch (error: Exception) {
+                        captureGate.set(false)
+                        mainExecutor.execute {
+                            onError(error.message ?: "Camera analysis failed.")
+                        }
+                    } finally {
+                        imageProxy.close()
+                    }
+                }
+
+                val cameraSelector = if (useFrontCamera) {
+                    CameraSelector.DEFAULT_FRONT_CAMERA
+                } else {
+                    CameraSelector.DEFAULT_BACK_CAMERA
+                }
+                cameraProvider.bindToLifecycle(
+                    lifecycleOwner,
+                    cameraSelector,
+                    previewUseCase,
+                    analysisUseCase
+                )
+                onCameraReady()
+            } catch (error: Exception) {
+                extractor?.close()
+                extractor = null
+                onError(error.message ?: "Failed to start camera.")
+            }
+        },
+        mainExecutor
+    )
+
+    return {
+        disposed.set(true)
+        captureGate.set(false)
+        provider?.unbindAll()
+        extractor?.close()
+    }
+}
+
+private fun normalizeActionName(raw: String): String {
+    return raw
+        .trim()
+        .lowercase(Locale.US)
+        .replace(Regex("\\s+"), "_")
+        .replace(Regex("[^a-z0-9_-]"), "")
+}
+
+private fun loadCollectorActions(context: Context): List<String> {
+    return runCatching {
+        context.assets.open("collector_actions.txt").bufferedReader().useLines { lines ->
+            lines
+                .map(::normalizeActionName)
+                .filter { it.isNotBlank() }
+                .distinct()
+                .toList()
+        }
+    }.getOrDefault(emptyList())
+}
+
+private fun mergeCollectorActions(
+    builtInActions: List<String>,
+    customActions: Set<String>
+): List<String> {
+    val merged = LinkedHashSet<String>()
+    builtInActions.forEach { action ->
+        normalizeActionName(action).takeIf { it.isNotBlank() }?.let(merged::add)
+    }
+    customActions
+        .map(::normalizeActionName)
+        .filter { it.isNotBlank() }
+        .sorted()
+        .forEach(merged::add)
+    return merged.toList()
+}
+
+private fun needsLegacyStoragePermission(context: Context): Boolean {
+    return Build.VERSION.SDK_INT <= Build.VERSION_CODES.P &&
+        ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.WRITE_EXTERNAL_STORAGE
+        ) != PackageManager.PERMISSION_GRANTED
+}
+
+private class CollectorStatsStore(context: Context) {
+    private val prefs = context.getSharedPreferences("collector_stats", Context.MODE_PRIVATE)
+
+    fun loadAll(): Map<String, Int> {
+        return prefs.all.mapNotNull { (key, value) ->
+            if (!key.startsWith(COUNT_PREFIX) || value !is Int) {
+                null
+            } else {
+                key.removePrefix(COUNT_PREFIX) to value
+            }
+        }.toMap()
+    }
+
+    fun increment(action: String): Int {
+        val key = COUNT_PREFIX + action
+        val next = prefs.getInt(key, 0) + 1
+        prefs.edit().putInt(key, next).apply()
+        return next
+    }
+
+    fun loadCustomActions(): Set<String> {
+        return prefs.getStringSet(ACTIONS_KEY, emptySet()).orEmpty()
+    }
+
+    fun addCustomAction(action: String) {
+        val normalized = normalizeActionName(action)
+        if (normalized.isBlank()) {
+            return
+        }
+        val updated = loadCustomActions().toMutableSet().apply {
+            add(normalized)
+        }
+        prefs.edit().putStringSet(ACTIONS_KEY, updated).apply()
+    }
+
+    fun loadAutoContinue(): Boolean {
+        return prefs.getBoolean(AUTO_CONTINUE_KEY, false)
+    }
+
+    fun saveAutoContinue(enabled: Boolean) {
+        prefs.edit().putBoolean(AUTO_CONTINUE_KEY, enabled).apply()
+    }
+
+    private companion object {
+        const val COUNT_PREFIX = "count_"
+        const val ACTIONS_KEY = "custom_actions"
+        const val AUTO_CONTINUE_KEY = "auto_continue"
+    }
+}

@@ -1,73 +1,47 @@
-# SignSpeak Android App
+# SignSpeak Collector Android App
 
-The primary mobile interface for the SignSpeak project, built with Kotlin and Jetpack Compose. This app is designed to break down communication barriers by providing Deaf/Hard-of-Hearing users and hearing individuals with real-time Pakistan Sign Language (PSL) translation directly on their mobile devices.
+The Android module is now a single-purpose landmark collection app for the SignSpeak PSL dataset. It uses the phone camera, CameraX, and MediaPipe Tasks to capture 60 hand-landmark frames per sign sample.
 
 ## Features
 
-- **Real-Time PSL Translation:** Leverages device camera and on-device ML for live sign recognition.
-- **PSL Dictionary:** A fully searchable sign vocabulary dictionary complete with categories and bookmarking capabilities.
-- **Translation History:** Allows users to view and manage their previously saved translations.
-- **Authentication:** Secure user login and profile management powered by Supabase.
-- **Complaint Submission:** Let users report incorrect predictions or offer dictionary feedback directly to administrators.
-- **Profile Management:** Users can manage their account settings seamlessly within the app.
+- Live camera collection with front/back camera switching.
+- 2-second countdown before recording.
+- 60-frame capture at 20 FPS.
+- Hand landmark overlay while recording.
+- Retake before saving.
+- JSON export to `Downloads/SignSpeakCollector/<action>/`.
+- Stable export format: `signspeak-landmarks-v1`.
 
 ## Tech Stack
 
-- **UI Framework:** Jetpack Compose
-- **Language:** Kotlin
-- **Camera API:** CameraX
-- **On-Device Machine Learning:** TensorFlow Lite, MediaPipe Tasks
-- **Backend & Auth:** Supabase (Auth, Postgres)
+- Kotlin
+- Jetpack Compose
+- CameraX
+- MediaPipe Tasks Vision
 
-## Prerequisites
+## Build And Install
 
-Before running the application, ensure you have:
-- **Android Studio** with the Android SDK installed.
-- A functional **JDK** configured (either embedded in Android Studio or system-wide).
-- An Android device or an active emulator.
-- Access to the overarching SignSpeak **Supabase Project ecosystem**.
+From the `kotlin app/` directory:
 
-## Project Configuration
-
-- **Application ID:** `com.example.kotlinfrontend`
-- **Minimum SDK:** 26
-- **Target SDK:** 36
-- **App Name:** `SignSpeak`
-
-## Setup & Running Guide
-
-### 1. Environment Configuration
-
-To communicate with the backend, you must provide your Supabase credentials. You can set them either via system environment variables or locally in a `local.properties` or `gradle.properties` file:
-
-```properties
-SUPABASE_URL=your_supabase_url
-SUPABASE_PUBLISHABLE_KEY=your_publishable_key
-```
-
-### 2. Build and Install via Command Line
-
-If you are using the terminal from the `kotlin app/` directory:
-
-#### On Windows:
 ```powershell
 .\gradlew.bat app:assembleDebug
 .\gradlew.bat app:installDebug
 ```
 
-#### On Linux / macOS:
-```bash
-./gradlew app:assembleDebug
-./gradlew app:installDebug
+Or open `kotlin app/` in Android Studio and run the `app` configuration on a physical Android device.
+
+## Export Flow
+
+1. Select or type an action name.
+2. Tap `Record Sample`.
+3. Perform the sign during the 60-frame capture.
+4. Tap `Save Sample` or `Retake`.
+5. Move the exported JSON files from the phone Downloads folder to your laptop.
+6. Import them into the ML dataset:
+
+```powershell
+cd ..\ml-pipeline
+python -m src.data.mobile_json_importer "path\to\phone\exports"
 ```
 
-### 3. Build via Android Studio
-
-Alternatively, open the `kotlin app/` folder directly in Android Studio:
-1. Wait for Gradle sync to finish.
-2. Select an emulator or connected physical device.
-3. Click the **Run** (Play) button in the toolbar.
-
-## Architecture Context
-
-The Android app communicates tightly with the central Supabase database. It relies heavily on tables such as `profiles`, `dictionary_entries`, `translation_history`, and `complaints`. Any moderation action recorded in the admin portal originated from this mobile application.
+Imported samples are appended under `ml-pipeline/data/raw/MP_Data_mobile/<action>/<sequence>/`.

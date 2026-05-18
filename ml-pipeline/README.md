@@ -56,6 +56,13 @@ Launch the GUI to record hand landmarks for new signs:
 python -m src.data.collection_gui
 ```
 
+Import JSON files exported by the Android collector into the mobile dataset folder:
+```powershell
+python -m src.data.mobile_json_importer "path\to\SignSpeakCollector"
+```
+
+By default, imported samples are appended to `data/raw/MP_Data_mobile/<action>/<sequence>/`.
+
 ### 2. Training Pipeline
 Retrain both the **Baseline** and **Augmented** models. This script uses smart caching—if you haven't added new data, it will load from cache instantly.
 ```powershell
@@ -136,6 +143,7 @@ pytest tests/test_cross_source.py          # Cross-source comparison tests
 pytest tests/test_augmentation_inspector.py # Augmentation validation tests
 pytest tests/test_feature_engineering.py   # Augmentation techniques tests
 pytest tests/test_ingestion.py             # Data ingestion tests
+pytest tests/test_mobile_json_importer.py  # Android collector JSON import tests
 ```
 
 **Run with verbose output:**
