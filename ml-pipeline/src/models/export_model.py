@@ -13,13 +13,21 @@ FEATURES_PER_FRAME = 126
 
 MODEL_ARTIFACTS = {
     "baseline": {
-        "model_path": os.path.join(MODELS_DIR, "action_model_baseline_legacy_v3.h5"),
-        "encoder_path": os.path.join(MODELS_DIR, "label_encoder_baseline_new.pkl"),
+        "model_path": os.path.join(MODELS_DIR, "old", "action_model_baseline_legacy_v3.h5"),
+        "encoder_path": os.path.join(MODELS_DIR, "old", "label_encoder_baseline_new.pkl"),
     },
     "augmented": {
-        "model_path": os.path.join(MODELS_DIR, "action_model_augmented_legacy_v3.h5"),
-        "encoder_path": os.path.join(MODELS_DIR, "label_encoder_augmented_new.pkl"),
-    }
+        "model_path": os.path.join(MODELS_DIR, "old", "action_model_augmented_legacy_v3.h5"),
+        "encoder_path": os.path.join(MODELS_DIR, "old", "label_encoder_augmented_new.pkl"),
+    },
+    "new50": {
+        "model_path": os.path.join(MODELS_DIR, "new", "action_model_laptop50_v4.h5"),
+        "encoder_path": os.path.join(MODELS_DIR, "new", "label_encoder_laptop50_v4.pkl"),
+    },
+    "new50_mobile20": {
+        "model_path": os.path.join(MODELS_DIR, "new", "action_model_laptop50_mobile20_v4.h5"),
+        "encoder_path": os.path.join(MODELS_DIR, "new", "label_encoder_laptop50_mobile20_v4.pkl"),
+    },
 }
 
 
@@ -74,8 +82,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Export SignSpeak Keras models to TensorFlow Lite.")
     parser.add_argument(
         "--model",
-        choices=["baseline", "augmented", "all"],
-        default="all",
+        choices=["baseline", "augmented", "new50", "new50_mobile20", "all", "all_new"],
+        default="all_new",
         help="Which model to export",
     )
     parser.add_argument(
@@ -92,7 +100,12 @@ def main() -> None:
     args = parser.parse_args()
 
     output_dir = Path(args.output_dir).resolve()
-    model_keys = ["baseline", "augmented"] if args.model == "all" else [args.model]
+    if args.model == "all":
+        model_keys = ["baseline", "augmented", "new50", "new50_mobile20"]
+    elif args.model == "all_new":
+        model_keys = ["new50", "new50_mobile20"]
+    else:
+        model_keys = [args.model]
     quantize = args.quantize == "dynamic"
 
     for model_key in model_keys:

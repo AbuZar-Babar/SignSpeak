@@ -84,6 +84,19 @@ Test the trained models live via your webcam:
 python -m src.pipelines.inference_pipeline
 ```
 
+Use specific model artifact profiles:
+
+```powershell
+# Legacy profile (default)
+python -m src.pipelines.inference_pipeline --model-profile legacy
+
+# New laptop-only 50 sequences/action model
+python -m src.pipelines.inference_pipeline --model-profile new50
+
+# New combined laptop50 + mobile20 model
+python -m src.pipelines.inference_pipeline --model-profile new50_mobile20
+```
+
 ### 4. Model Evaluation
 Generate detailed performance reports, confusion matrices, and F1-score benchmarks:
 ```powershell

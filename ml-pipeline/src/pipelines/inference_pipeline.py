@@ -4,14 +4,44 @@ import tensorflow as tf
 from tensorflow.keras.models import load_model
 import joblib
 import mediapipe as mp
+import argparse
 from src.utils.mediapipe_utils import mediapipe_detection, extract_keypoints, draw_landmarks
 import os
 
 from src.config.config import load_actions, SEQUENCE_LENGTH, PREDICTION_THRESHOLD, MODELS_DIR
 
+MODEL_PROFILES = {
+    "legacy": {
+        "model": "old/action_model_baseline_legacy_v3.h5",
+        "encoder": "old/label_encoder_baseline_old.pkl",
+    },
+    "new50": {
+        "model": "new/action_model_laptop50_v4.h5",
+        "encoder": "new/label_encoder_laptop50_v4.pkl",
+    },
+    "new50_mobile20": {
+        "model": "new/action_model_laptop50_mobile20_v4.h5",
+        "encoder": "new/label_encoder_laptop50_mobile20_v4.pkl",
+    },
+}
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Run SignSpeak real-time inference.")
+    parser.add_argument(
+        "--model-profile",
+        choices=MODEL_PROFILES.keys(),
+        default="legacy",
+        help="Model/encoder artifact pair to use for inference.",
+    )
+    return parser.parse_args()
+
+
 def main():
-    model_path = os.path.join(MODELS_DIR, "action_model_baseline_legacy_v3.h5")
-    encoder_path = os.path.join(MODELS_DIR, "label_encoder_baseline_old.pkl")
+    args = parse_args()
+    selected = MODEL_PROFILES[args.model_profile]
+    model_path = os.path.join(MODELS_DIR, selected["model"])
+    encoder_path = os.path.join(MODELS_DIR, selected["encoder"])
     print(f"Loading {model_path}...")
     actions = load_actions()
     model = load_model(model_path, compile=False)
