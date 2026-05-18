@@ -62,6 +62,22 @@ Retrain both the **Baseline** and **Augmented** models. This script uses smart c
 python -m src.pipelines.training_pipeline
 ```
 
+
+### 2.1 V4 No-Augmentation Training (Laptop50 + Combined)
+Train two **no-augmentation** model variants in one run:
+- `Laptop-only`: 50 sequences/action from `data/raw/MP_Data`
+- `Combined`: 50 sequences/action from laptop + 20 sequences/action from mobile
+
+Artifacts produced:
+- `models/new/action_model_laptop50_v4.h5`
+- `models/new/label_encoder_laptop50_v4.pkl`
+- `models/new/action_model_laptop50_mobile20_v4.h5`
+- `models/new/label_encoder_laptop50_mobile20_v4.pkl`
+
+```powershell
+python -m src.pipelines.training_pipeline_v4_no_aug
+```
+
 ### 3. Real-Time Inference
 Test the trained models live via your webcam:
 ```powershell
