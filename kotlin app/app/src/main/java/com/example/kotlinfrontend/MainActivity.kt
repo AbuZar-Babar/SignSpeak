@@ -56,6 +56,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -94,6 +95,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 private const val COLLECTION_FORMAT = "signspeak-landmarks-v1"
 private const val SEQUENCE_LENGTH = 60
@@ -101,6 +103,8 @@ private const val FRAME_DIM = 126
 private const val TARGET_FPS = 20
 private const val ANALYSIS_WIDTH = 640
 private const val ANALYSIS_HEIGHT = 480
+private const val MIN_SIGN_GAP_SECONDS = 0.5f
+private const val MAX_SIGN_GAP_SECONDS = 5.0f
 
 private val HAND_CONNECTIONS: List<Pair<Int, Int>> = listOf(
     0 to 1, 1 to 2, 2 to 3, 3 to 4,
@@ -163,6 +167,7 @@ private fun CollectorApp() {
     var actionText by remember { mutableStateOf(suggestedActions.firstOrNull().orEmpty()) }
     var useFrontCamera by remember { mutableStateOf(true) }
     var autoContinue by remember { mutableStateOf(statsStore.loadAutoContinue()) }
+    var signGapSeconds by remember { mutableStateOf(statsStore.loadSignGapSeconds()) }
     var phase by remember { mutableStateOf(CapturePhase.Idle) }
     var countdown by remember { mutableIntStateOf(0) }
     var recordedFrames by remember { mutableIntStateOf(0) }
@@ -260,11 +265,14 @@ private fun CollectorApp() {
         lastExportPath = null
 
         countdownJob = coroutineScope.launch {
+            val delayMillis = (signGapSeconds * 1_000f).roundToInt().toLong()
             phase = CapturePhase.Countdown
-            statusText = "Get ready for $action."
-            for (value in 2 downTo 1) {
-                countdown = value
-                delay(1_000L)
+            statusText = "Get ready for $action. Starting in ${"%.1f".format(Locale.US, signGapSeconds)}s."
+            val halfSecondTicks = (delayMillis / 500L).toInt()
+            for (tick in halfSecondTicks downTo 1) {
+                val remainingMillis = tick * 500L
+                countdown = ((remainingMillis + 999L) / 1_000L).toInt()
+                delay(500L)
             }
             countdown = 0
             phase = CapturePhase.Recording
@@ -420,6 +428,7 @@ private fun CollectorApp() {
         statusText = statusText,
         useFrontCamera = useFrontCamera,
         autoContinue = autoContinue,
+        signGapSeconds = signGapSeconds,
         previewView = previewView,
         overlayHands = overlayHands,
         onActionTextChange = { actionText = it },
@@ -433,6 +442,10 @@ private fun CollectorApp() {
             } else {
                 "Auto continue disabled."
             }
+        },
+        onSignGapChange = { value ->
+            signGapSeconds = value
+            statsStore.saveSignGapSeconds(value)
         },
         onRequestCameraPermission = {
             cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
@@ -463,12 +476,14 @@ private fun CollectorScreen(
     statusText: String,
     useFrontCamera: Boolean,
     autoContinue: Boolean,
+    signGapSeconds: Float,
     previewView: PreviewView,
     overlayHands: List<HandWireframe>,
     onActionTextChange: (String) -> Unit,
     onActionSelected: (String) -> Unit,
     onAddAction: () -> Unit,
     onAutoContinueChange: (Boolean) -> Unit,
+    onSignGapChange: (Float) -> Unit,
     onRequestCameraPermission: () -> Unit,
     onToggleCamera: () -> Unit,
     onStartCapture: () -> Unit,
@@ -526,10 +541,12 @@ private fun CollectorScreen(
                 lastExportPath = lastExportPath,
                 useFrontCamera = useFrontCamera,
                 autoContinue = autoContinue,
+                signGapSeconds = signGapSeconds,
                 onActionTextChange = onActionTextChange,
                 onActionSelected = onActionSelected,
                 onAddAction = onAddAction,
                 onAutoContinueChange = onAutoContinueChange,
+                onSignGapChange = onSignGapChange,
                 onToggleCamera = onToggleCamera,
                 onStartCapture = onStartCapture,
                 onStopCapture = onStopCapture,
@@ -672,10 +689,12 @@ private fun ControlPanel(
     lastExportPath: String?,
     useFrontCamera: Boolean,
     autoContinue: Boolean,
+    signGapSeconds: Float,
     onActionTextChange: (String) -> Unit,
     onActionSelected: (String) -> Unit,
     onAddAction: () -> Unit,
     onAutoContinueChange: (Boolean) -> Unit,
+    onSignGapChange: (Float) -> Unit,
     onToggleCamera: () -> Unit,
     onStartCapture: () -> Unit,
     onStopCapture: () -> Unit,
@@ -739,6 +758,27 @@ private fun ControlPanel(
                         enabled = phase == CapturePhase.Idle || phase == CapturePhase.Captured
                     )
                 }
+            }
+
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "Gap between signs: ${"%.1f".format(Locale.US, signGapSeconds)}s",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Color(0xFF33402C)
+                )
+                Slider(
+                    value = signGapSeconds,
+                    onValueChange = { raw ->
+                        val snapped = (raw * 2f).roundToInt() / 2f
+                        onSignGapChange(snapped.coerceIn(MIN_SIGN_GAP_SECONDS, MAX_SIGN_GAP_SECONDS))
+                    },
+                    valueRange = MIN_SIGN_GAP_SECONDS..MAX_SIGN_GAP_SECONDS,
+                    steps = 8,
+                    enabled = phase == CapturePhase.Idle || phase == CapturePhase.Captured
+                )
             }
 
             if (suggestedActions.isNotEmpty()) {
@@ -1216,9 +1256,21 @@ private class CollectorStatsStore(context: Context) {
         prefs.edit().putBoolean(AUTO_CONTINUE_KEY, enabled).apply()
     }
 
+    fun loadSignGapSeconds(): Float {
+        return prefs
+            .getFloat(SIGN_GAP_SECONDS_KEY, 3.0f)
+            .coerceIn(MIN_SIGN_GAP_SECONDS, MAX_SIGN_GAP_SECONDS)
+    }
+
+    fun saveSignGapSeconds(seconds: Float) {
+        val safeSeconds = seconds.coerceIn(MIN_SIGN_GAP_SECONDS, MAX_SIGN_GAP_SECONDS)
+        prefs.edit().putFloat(SIGN_GAP_SECONDS_KEY, safeSeconds).apply()
+    }
+
     private companion object {
         const val COUNT_PREFIX = "count_"
         const val ACTIONS_KEY = "custom_actions"
         const val AUTO_CONTINUE_KEY = "auto_continue"
+        const val SIGN_GAP_SECONDS_KEY = "sign_gap_seconds"
     }
 }
