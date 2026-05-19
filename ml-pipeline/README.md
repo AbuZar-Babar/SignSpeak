@@ -56,6 +56,28 @@ Launch the GUI to record hand landmarks for new signs:
 python -m src.data.collection_gui
 ```
 
+### 1.1 Mobile JSON Import (JSON -> NPY)
+Convert Android-collected JSON landmark files into frame-wise `.npy` sequences.
+
+Default paths:
+- Input: `data/raw/MP_Data_from_mobile`
+- Output: `data/processed/mobile_json_npy`
+
+```powershell
+python -m src.pipelines.mobile_json_exporter
+```
+
+Custom input/output:
+
+```powershell
+python -m src.pipelines.mobile_json_exporter data/raw/mp_data_mobile --output-dir data/processed/mobile_json_npy
+```
+
+If your action names are not in `data/external/actions.txt`, allow new actions:
+
+```powershell
+python -m src.pipelines.mobile_json_exporter --allow-new-actions
+```
 ### 2. Training Pipeline
 Retrain both the **Baseline** and **Augmented** models. This script uses smart caching—if you haven't added new data, it will load from cache instantly.
 ```powershell
@@ -190,4 +212,5 @@ python -m src.analysis --output analysis_report.json
 The dataset used in this project is live and open-source:
 - [**Kaggle**](https://www.kaggle.com/datasets/mohib123456/dynamic-word-level-pakistan-sign-language-dataset/data)
 - [**HuggingFace**](https://huggingface.co/datasets/mohibkhansherwani/DynamicWordLevelPakistanSignLanguageDataset)
+
 
