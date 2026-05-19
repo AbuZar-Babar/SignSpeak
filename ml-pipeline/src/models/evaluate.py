@@ -20,8 +20,8 @@ from src.pipelines.training_pipeline import build_model
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DATA_SOURCES = {
-    "laptop": os.path.join(PROJECT_ROOT, "data", "raw", "MP_Data"),
-    "mobile": os.path.join(PROJECT_ROOT, "data", "raw", "MP_Data_mobile"),
+    "laptop": os.path.join(PROJECT_ROOT, "data", "raw", "MP_Data_laptop"),
+    "mobile": os.path.join(PROJECT_ROOT, "data", "raw", "MP_data_webcam"),
 }
 MODEL_AUGMENTED = os.path.join(PROJECT_ROOT, "models", "action_model_augmented_legacy.h5")
 ENCODER_AUGMENTED = os.path.join(PROJECT_ROOT, "models", "label_encoder_augmented_new.pkl")
@@ -223,3 +223,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+

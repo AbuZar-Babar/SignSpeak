@@ -29,8 +29,8 @@ ENCODER_LAPTOP_ONLY = os.path.join(V4_OUTPUT_DIR, "label_encoder_laptop50_v4.pkl
 MODEL_COMBINED = os.path.join(V4_OUTPUT_DIR, "action_model_laptop50_mobile20_v4.h5")
 ENCODER_COMBINED = os.path.join(V4_OUTPUT_DIR, "label_encoder_laptop50_mobile20_v4.pkl")
 
-LAPTOP_DIR = os.path.join(RAW_DIR, "MP_Data")
-MOBILE_DIR = os.path.join(RAW_DIR, "MP_Data_mobile")
+LAPTOP_DIR = os.path.join(RAW_DIR, "MP_Data_laptop")
+MOBILE_DIR = os.path.join(RAW_DIR, "MP_data_webcam")
 
 
 def build_model(input_shape, num_classes):
@@ -184,3 +184,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+

@@ -29,8 +29,8 @@ ENCODER_BASELINE  = os.path.join(MODELS_DIR, "label_encoder_baseline_new.pkl")
 ENCODER_AUGMENTED = os.path.join(MODELS_DIR, "label_encoder_augmented_new.pkl")
 
 DATA_SOURCES = [
-    os.path.join(RAW_DIR, "MP_Data"),
-    os.path.join(RAW_DIR, "MP_Data_mobile"),
+    os.path.join(RAW_DIR, "MP_Data_laptop"),
+    os.path.join(RAW_DIR, "MP_data_webcam"),
 ]
 from src.data.ingestion import load_data
 
@@ -227,7 +227,7 @@ def compare_and_report(baseline, augmented):
 def main():
     total_t0 = time.time()
     print("=" * 70)
-    print("SIGNSPEAK - Combined Training (MP_Data + MP_Data_mobile)")
+    print("SIGNSPEAK - Combined Training (MP_Data_laptop + MP_data_webcam)")
     print("=" * 70)
     os.makedirs(MODELS_DIR, exist_ok=True)
     actions = load_actions()
@@ -273,3 +273,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+

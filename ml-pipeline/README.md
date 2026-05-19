@@ -65,7 +65,7 @@ python -m src.pipelines.training_pipeline
 
 ### 2.1 V4 No-Augmentation Training (Laptop50 + Combined)
 Train two **no-augmentation** model variants in one run:
-- `Laptop-only`: 50 sequences/action from `data/raw/MP_Data`
+- `Laptop-only`: 50 sequences/action from `data/raw/MP_Data_laptop`
 - `Combined`: 50 sequences/action from laptop + 20 sequences/action from mobile
 
 Artifacts produced:
@@ -190,3 +190,4 @@ python -m src.analysis --output analysis_report.json
 The dataset used in this project is live and open-source:
 - [**Kaggle**](https://www.kaggle.com/datasets/mohib123456/dynamic-word-level-pakistan-sign-language-dataset/data)
 - [**HuggingFace**](https://huggingface.co/datasets/mohibkhansherwani/DynamicWordLevelPakistanSignLanguageDataset)
+

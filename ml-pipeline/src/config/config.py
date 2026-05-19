@@ -6,8 +6,8 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 ACTIONS_FILE = os.path.join(PROJECT_ROOT, "data", "external", "actions.txt")
 
 DATASET_FOLDERS = {
-    "laptop": os.path.join(PROJECT_ROOT, "data", "raw", "MP_Data"),         
-    "mobile": os.path.join(PROJECT_ROOT, "data", "raw", "MP_Data_mobile"),  
+    "laptop": os.path.join(PROJECT_ROOT, "data", "raw", "MP_Data_laptop"),         
+    "mobile": os.path.join(PROJECT_ROOT, "data", "raw", "MP_data_webcam"),  
 }
 _dataset_setting = os.getenv("SIGNSPEAK_DATASET", "laptop").strip() # Change this line to swap to change dataset
 ACTIVE_DATASET = _dataset_setting.lower()
@@ -56,3 +56,5 @@ def load_actions():
         raise ValueError("actions.txt is empty. Add one action per line.")
 
     return actions
+
+

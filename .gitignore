@@ -68,6 +68,7 @@ ml-pipeline/models/new/
 ml-pipeline/models/*.h5
 ml-pipeline/models/*.pkl
 ml-pipeline/.pytest_cache/
+ml-pipeline/data/raw/MP_DATA_FROM_MOBILE/
 
 # Documentation
 SDD/
