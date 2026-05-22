@@ -1,10 +1,15 @@
 import argparse
 import json
 from pathlib import Path
+import sys
 
 import joblib
 import tensorflow as tf
 from tensorflow.keras.models import load_model
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.config.config import SEQUENCE_LENGTH, MODELS_DIR
 import os
@@ -28,24 +33,42 @@ MODEL_ARTIFACTS = {
         "model_path": os.path.join(MODELS_DIR, "new", "action_model_laptop50_mobile20_v4.h5"),
         "encoder_path": os.path.join(MODELS_DIR, "new", "label_encoder_laptop50_mobile20_v4.pkl"),
     },
+    "mobile_json_v5": {
+        "model_path": os.path.join(MODELS_DIR, "new", "action_model_mobile_json_no_aug_v5.h5"),
+        "encoder_path": os.path.join(MODELS_DIR, "new", "label_encoder_mobile_json_no_aug_v5.pkl"),
+    },
 }
 
 
-def convert_to_tflite(model: tf.keras.Model, quantize: bool = False) -> bytes:
+def convert_to_tflite(
+    model: tf.keras.Model,
+    quantize: bool = False,
+    use_select_tf_ops: bool = False,
+) -> bytes:
     converter = tf.lite.TFLiteConverter.from_keras_model(model)
-    converter.target_spec.supported_ops = [
-        tf.lite.OpsSet.TFLITE_BUILTINS, 
-        tf.lite.OpsSet.SELECT_TF_OPS
-    ]
-    converter._experimental_lower_tensor_list_ops = False
-    converter.experimental_enable_resource_variables = True
+    if use_select_tf_ops:
+        converter.target_spec.supported_ops = [
+            tf.lite.OpsSet.TFLITE_BUILTINS,
+            tf.lite.OpsSet.SELECT_TF_OPS,
+        ]
+        converter._experimental_lower_tensor_list_ops = False
+    else:
+        converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS]
+        # Enables lowering TensorList-based LSTM graphs to builtins-only TFLite
+        # for fixed single-batch inference (our mobile app uses batch size 1).
+        converter._experimental_default_to_single_batch_in_tensor_list_ops = True
     converter.experimental_enable_resource_variables = True
     if quantize:
         converter.optimizations = [tf.lite.Optimize.DEFAULT]
     return converter.convert()
 
 
-def convert_model(model_key: str, output_dir: Path, quantize: bool) -> None:
+def convert_model(
+    model_key: str,
+    output_dir: Path,
+    quantize: bool,
+    use_select_tf_ops: bool,
+) -> None:
     artifact = MODEL_ARTIFACTS[model_key]
     model_path = Path(artifact["model_path"])
     encoder_path = Path(artifact["encoder_path"])
@@ -59,8 +82,13 @@ def convert_model(model_key: str, output_dir: Path, quantize: bool) -> None:
     model = load_model(str(model_path), compile=False)
 
     mode_label = "quantized" if quantize else "float"
-    print(f"[{model_key}] Converting to TensorFlow Lite ({mode_label}) ...")
-    tflite_model = convert_to_tflite(model, quantize=quantize)
+    ops_label = "select_tf_ops" if use_select_tf_ops else "builtins_only"
+    print(f"[{model_key}] Converting to TensorFlow Lite ({mode_label}, {ops_label}) ...")
+    tflite_model = convert_to_tflite(
+        model,
+        quantize=quantize,
+        use_select_tf_ops=use_select_tf_ops,
+    )
 
     output_dir.mkdir(parents=True, exist_ok=True)
     model_suffix = "_quantized" if quantize else ""
@@ -82,7 +110,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Export SignSpeak Keras models to TensorFlow Lite.")
     parser.add_argument(
         "--model",
-        choices=["baseline", "augmented", "new50", "new50_mobile20", "all", "all_new"],
+        choices=["baseline", "augmented", "new50", "new50_mobile20", "mobile_json_v5", "all", "all_new"],
         default="all_new",
         help="Which model to export",
     )
@@ -97,6 +125,11 @@ def main() -> None:
         default="none",
         help="Quantization mode for TFLite export",
     )
+    parser.add_argument(
+        "--use-select-tf-ops",
+        action="store_true",
+        help="Enable SELECT_TF_OPS (requires tensorflow-lite-select-tf-ops on Android, larger APK).",
+    )
     args = parser.parse_args()
 
     output_dir = Path(args.output_dir).resolve()
@@ -107,9 +140,15 @@ def main() -> None:
     else:
         model_keys = [args.model]
     quantize = args.quantize == "dynamic"
+    use_select_tf_ops = args.use_select_tf_ops
 
     for model_key in model_keys:
-        convert_model(model_key, output_dir, quantize=quantize)
+        convert_model(
+            model_key,
+            output_dir,
+            quantize=quantize,
+            use_select_tf_ops=use_select_tf_ops,
+        )
 
 
 if __name__ == "__main__":
