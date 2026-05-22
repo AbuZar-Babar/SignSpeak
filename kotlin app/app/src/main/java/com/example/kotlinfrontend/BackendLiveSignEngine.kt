@@ -63,7 +63,8 @@ class BackendLiveSignEngine(
             imageProxy = imageProxy,
             timestampMs = timestampMs,
             includeOverlay = includeOverlay,
-            includeFace = includeFace
+            includeFace = includeFace,
+            includeFaceBlendshapes = true
         )
         val frameVector = extraction.vector
 
@@ -108,7 +109,7 @@ class BackendLiveSignEngine(
 
         return LiveInferenceState(
             rawPrediction = latestPredictionSnapshot,
-            faceExpression = null,
+            faceExpression = extraction.faceExpression,
             displayedLabel = displayState.label,
             displayedConfidence = displayState.confidence,
             stability = displayState.stability,

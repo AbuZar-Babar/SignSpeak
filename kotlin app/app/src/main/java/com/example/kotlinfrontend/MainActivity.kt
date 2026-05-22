@@ -3,6 +3,7 @@ package com.example.kotlinfrontend
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.SystemClock
 import android.util.Log
 import android.util.Size
 import androidx.activity.ComponentActivity
@@ -213,7 +214,6 @@ fun LiveCameraScreen(
     var confidence by remember { mutableFloatStateOf(0f) }
     var faceExpressionText by remember { mutableStateOf("--") }
     var faceExpressionConfidence by remember { mutableFloatStateOf(0f) }
-    var faceExpressionDebugText by remember { mutableStateOf("") }
     var stability by remember { mutableFloatStateOf(0f) }
     var transcript by remember { mutableStateOf("") }
     var overlayHands by remember { mutableStateOf<List<HandWireframe>>(emptyList()) }
@@ -249,6 +249,20 @@ fun LiveCameraScreen(
         GeminiSentenceFormer(BuildConfig.GEMINI_API_KEY)
     }
     var sentenceRequestVersion by remember { mutableIntStateOf(0) }
+    val sentenceEmotionFreshnessMs = 2_000L
+    var latestSentenceEmotionContext by remember { mutableStateOf<SentenceEmotionContext?>(null) }
+    var latestSentenceEmotionObservedAtMs by remember { mutableLongStateOf(0L) }
+
+    fun clearSentenceEmotionContext() {
+        latestSentenceEmotionContext = null
+        latestSentenceEmotionObservedAtMs = 0L
+    }
+
+    fun freshSentenceEmotionContext(): SentenceEmotionContext? {
+        val contextSnapshot = latestSentenceEmotionContext ?: return null
+        val ageMs = SystemClock.elapsedRealtime() - latestSentenceEmotionObservedAtMs
+        return contextSnapshot.takeIf { ageMs in 0L..sentenceEmotionFreshnessMs }
+    }
 
     LaunchedEffect(Unit) {
         val key = BuildConfig.GEMINI_API_KEY.trim()
@@ -347,7 +361,7 @@ fun LiveCameraScreen(
         lastProcessedFrameNs.set(0L)
         faceExpressionText = "--"
         faceExpressionConfidence = 0f
-        faceExpressionDebugText = ""
+        clearSentenceEmotionContext()
         overlayHands = emptyList()
         overlayFace = null
         roundTripMs = null
@@ -373,7 +387,7 @@ fun LiveCameraScreen(
         confidence = 0f
         faceExpressionText = "--"
         faceExpressionConfidence = 0f
-        faceExpressionDebugText = ""
+        clearSentenceEmotionContext()
         stability = 0f
         inferenceMs = 0L
         roundTripMs = null
@@ -433,7 +447,7 @@ fun LiveCameraScreen(
         confidence = 0f
         faceExpressionText = "--"
         faceExpressionConfidence = 0f
-        faceExpressionDebugText = ""
+        clearSentenceEmotionContext()
         stability = 0f
         inferenceMs = 0L
         roundTripMs = null
@@ -510,14 +524,22 @@ fun LiveCameraScreen(
                                 fps = liveState.fps
                                 predictedText = liveState.displayedLabel
                                 confidence = liveState.displayedConfidence.coerceIn(0f, 1f)
-                                faceExpressionText = liveState.faceExpression?.label ?: "--"
-                                faceExpressionConfidence = liveState.faceExpression?.confidence?.coerceIn(0f, 1f) ?: 0f
-                                faceExpressionDebugText = liveState.faceExpression?.topScores
-                                    ?.take(3)
-                                    ?.joinToString("  ") { score ->
-                                        "${score.name.replaceFirstChar { it.uppercase() }} ${(score.score * 100f).roundToInt()}%"
-                                    }
-                                    .orEmpty()
+                                val normalizedSentenceEmotion =
+                                    SentenceEmotionContext.fromFaceExpression(liveState.faceExpression)
+                                faceExpressionText = emotionDisplayLabel(
+                                    normalizedSentenceEmotion,
+                                    liveState.faceExpression
+                                )
+                                faceExpressionConfidence = emotionDisplayConfidence(
+                                    normalizedSentenceEmotion,
+                                    liveState.faceExpression
+                                )
+                                if (normalizedSentenceEmotion != null) {
+                                    latestSentenceEmotionContext = normalizedSentenceEmotion
+                                    latestSentenceEmotionObservedAtMs = SystemClock.elapsedRealtime()
+                                } else if (liveState.faceExpression != null) {
+                                    clearSentenceEmotionContext()
+                                }
                                 stability = liveState.stability.coerceIn(0f, 1f)
                                 transcript = liveState.transcript
                                 overlayHands = liveState.overlayHands
@@ -552,7 +574,8 @@ fun LiveCameraScreen(
 
                                             val result = geminiSentenceFormer.formSentence(
                                                 words = currentWords,
-                                                language = sentenceLanguage
+                                                language = sentenceLanguage,
+                                                emotionContext = freshSentenceEmotionContext()
                                             )
 
                                             if (requestVersion == sentenceRequestVersion) {
@@ -1080,9 +1103,9 @@ fun LiveCameraScreen(
                         ) {
                             Text(
                                 text = if (faceExpressionText == "--") {
-                                    "Face cues: detecting"
+                                    "Emotion: detecting"
                                 } else {
-                                    "Face cues: $faceExpressionText"
+                                    "Emotion: $faceExpressionText"
                                 },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = Color(0xFFFFE7A3),
@@ -1101,17 +1124,6 @@ fun LiveCameraScreen(
                                 color = Color(0xFFFFE7A3)
                             )
                         }
-                        if (faceExpressionDebugText.isNotBlank()) {
-                            Text(
-                                text = faceExpressionDebugText,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color(0xFFD7C07A),
-                                modifier = Modifier.fillMaxWidth(),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-
                         // Transcript row
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -1133,6 +1145,7 @@ fun LiveCameraScreen(
                                             liveEngineRef.get()?.clearTranscript()
                                             transcript = ""
                                             formedSentence = ""
+                                            clearSentenceEmotionContext()
                                             sentenceError = false
                                             sentenceErrorMessage = null
                                             isSentenceLoading = false
@@ -1427,7 +1440,8 @@ fun LiveCameraScreen(
                                                             sentenceError = false
                                                             val result = geminiSentenceFormer.formSentence(
                                                                 words = currentWords,
-                                                                language = lang
+                                                                language = lang,
+                                                                emotionContext = freshSentenceEmotionContext()
                                                             )
                                                             if (requestVersion == sentenceRequestVersion) {
                                                                 formedSentence = result.formedSentence
@@ -1551,6 +1565,39 @@ fun LiveCameraScreen(
 }
 
 // ── Helper composables ─────────────────────────────────────────────────────────
+
+private fun emotionDisplayLabel(
+    emotionContext: SentenceEmotionContext?,
+    faceExpression: FaceExpressionSignal?
+): String {
+    emotionContext?.let { context ->
+        return when (context.toneLabel) {
+            "happy/warm" -> "Happy"
+            "sad/concerned" -> "Sad"
+            "surprised/emphatic" -> "Surprised"
+            "serious/concerned" -> "Serious"
+            else -> context.toneLabel.substringBefore('/').replaceFirstChar { it.uppercase() }
+        }
+    }
+
+    return if (faceExpression?.label.equals("Neutral", ignoreCase = true)) {
+        "Neutral"
+    } else {
+        "--"
+    }
+}
+
+private fun emotionDisplayConfidence(
+    emotionContext: SentenceEmotionContext?,
+    faceExpression: FaceExpressionSignal?
+): Float {
+    emotionContext?.let { return it.confidence.coerceIn(0f, 1f) }
+    return if (faceExpression?.label.equals("Neutral", ignoreCase = true)) {
+        faceExpression?.confidence?.coerceIn(0f, 1f) ?: 0f
+    } else {
+        0f
+    }
+}
 
 @Composable
 private fun CameraOptionChip(
