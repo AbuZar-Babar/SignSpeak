@@ -243,6 +243,7 @@ fun LiveCameraScreen(
     var isSentenceLoading by remember { mutableStateOf(false) }
     var sentenceError by remember { mutableStateOf(false) }
     var sentenceErrorMessage by remember { mutableStateOf<String?>(null) }
+    var sentenceEmotionContextEnabled by remember { mutableStateOf(true) }
     val sentenceWordThreshold = 3
     var sentenceDebounceJob by remember { mutableStateOf<Job?>(null) }
     val geminiSentenceFormer = remember {
@@ -259,6 +260,9 @@ fun LiveCameraScreen(
     }
 
     fun freshSentenceEmotionContext(): SentenceEmotionContext? {
+        if (!sentenceEmotionContextEnabled) {
+            return null
+        }
         val contextSnapshot = latestSentenceEmotionContext ?: return null
         val ageMs = SystemClock.elapsedRealtime() - latestSentenceEmotionObservedAtMs
         return contextSnapshot.takeIf { ageMs in 0L..sentenceEmotionFreshnessMs }
@@ -725,6 +729,8 @@ fun LiveCameraScreen(
         sentenceModeEnabled = backendSettingsRepository.sentenceModeEnabledFlow.first()
         // Restore previously chosen output language (persisted across sessions)
         sentenceLanguage = backendSettingsRepository.sentenceLanguageFlow.first()
+        sentenceEmotionContextEnabled =
+            backendSettingsRepository.sentenceEmotionContextEnabledFlow.first()
     }
 
     LaunchedEffect(hasPermission, inferenceMode, selectedModel, performanceMode, useQuantizedModel, activeBackendUrl, useFrontCamera) {
@@ -837,11 +843,27 @@ fun LiveCameraScreen(
                     enter = expandVertically() + fadeIn(),
                     exit = shrinkVertically() + fadeOut()
                 ) {
-                    Text(
-                        text = "When enabled, SignSpeak forms a sentence after at least $sentenceWordThreshold detected words.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF6B7280)
-                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            text = "When enabled, SignSpeak forms a sentence after at least $sentenceWordThreshold detected words.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFF6B7280)
+                        )
+                        SettingsToggleRow(
+                            label = "Use Emotion Context",
+                            description = "Let Gemini use detected emotion only for sentence tone",
+                            checked = sentenceEmotionContextEnabled,
+                            onCheckedChange = { enabled ->
+                                sentenceEmotionContextEnabled = enabled
+                                coroutineScope.launch {
+                                    backendSettingsRepository.saveSentenceEmotionContextEnabled(enabled)
+                                }
+                                if (!enabled) {
+                                    clearSentenceEmotionContext()
+                                }
+                            }
+                        )
+                    }
                 }
 
                 // ── Advanced settings (dev / non-product mode only) ──────────

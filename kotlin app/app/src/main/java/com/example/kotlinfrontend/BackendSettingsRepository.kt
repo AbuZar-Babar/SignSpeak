@@ -18,6 +18,7 @@ class BackendSettingsRepository(private val context: Context) {
         val backendBaseUrl = stringPreferencesKey("backend_base_url")
         val sentenceModeEnabled = booleanPreferencesKey("sentence_mode_enabled")
         val sentenceLanguage = stringPreferencesKey("sentence_language")
+        val sentenceEmotionContextEnabled = booleanPreferencesKey("sentence_emotion_context_enabled")
     }
 
     val backendBaseUrlFlow: Flow<String> = context.backendSettingsDataStore.data
@@ -61,6 +62,18 @@ class BackendSettingsRepository(private val context: Context) {
             }
         }
 
+    val sentenceEmotionContextEnabledFlow: Flow<Boolean> = context.backendSettingsDataStore.data
+        .catch { error ->
+            if (error is IOException) {
+                emit(emptyPreferences())
+            } else {
+                throw error
+            }
+        }
+        .map { preferences ->
+            preferences[Keys.sentenceEmotionContextEnabled] ?: true
+        }
+
     suspend fun saveBackendBaseUrl(baseUrl: String) {
         context.backendSettingsDataStore.edit { preferences ->
             if (baseUrl.isBlank()) {
@@ -80,6 +93,12 @@ class BackendSettingsRepository(private val context: Context) {
     suspend fun saveSentenceLanguage(language: SentenceLanguage) {
         context.backendSettingsDataStore.edit { preferences ->
             preferences[Keys.sentenceLanguage] = language.name
+        }
+    }
+
+    suspend fun saveSentenceEmotionContextEnabled(enabled: Boolean) {
+        context.backendSettingsDataStore.edit { preferences ->
+            preferences[Keys.sentenceEmotionContextEnabled] = enabled
         }
     }
 }
