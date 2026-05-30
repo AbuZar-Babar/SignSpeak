@@ -271,6 +271,11 @@ fun LiveCameraScreen(
         }
     }
 
+    // Keep this build strictly on-device.
+    LaunchedEffect(Unit) {
+        inferenceMode = InferenceMode.ON_DEVICE
+    }
+
     overlayEnabledGate.set(showHandOverlay && !performanceMode)
     faceEnabledGate.set(showFaceOverlay && !performanceMode)
 
@@ -720,8 +725,7 @@ fun LiveCameraScreen(
         else -> Color(0xFF94A3B8)
     }
     val canStartRecording = if (isRecording) true else {
-        hasPermission && isModelReady && !isModelLoading &&
-            (inferenceMode == InferenceMode.ON_DEVICE || (isBackendReachable && !isBackendChecking))
+        hasPermission && isModelReady && !isModelLoading
     }
     val currentDrawerModelOptionsContent by rememberUpdatedState<(@Composable () -> Unit)?>(
         {
@@ -817,18 +821,12 @@ fun LiveCameraScreen(
                     ) {
                         CameraOptionChip(
                             label = "On Device",
-                            selected = inferenceMode == InferenceMode.ON_DEVICE,
+                            selected = true,
                             modifier = Modifier.weight(1f),
                             onClick = { inferenceMode = InferenceMode.ON_DEVICE }
                         )
-                        CameraOptionChip(
-                            label = "Backend",
-                            selected = inferenceMode == InferenceMode.BACKEND_LANDMARKS,
-                            modifier = Modifier.weight(1f),
-                            onClick = { inferenceMode = InferenceMode.BACKEND_LANDMARKS }
-                        )
                     }
-                    if (inferenceMode == InferenceMode.BACKEND_LANDMARKS) {
+                    if (false) {
                         OutlinedTextField(
                             value = backendUrlInput,
                             onValueChange = {

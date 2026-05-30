@@ -25,10 +25,10 @@ V4_OUTPUT_DIR = os.path.join(MODELS_DIR, "new")
 MOBILE_JSON_NPY_DIR = os.path.join(PROCESSED_DIR, "mobile_json_npy")
 
 MODEL_MOBILE_JSON_NO_AUG = os.path.join(
-    V4_OUTPUT_DIR, "action_model_mobile_json_no_aug_v5.h5"
+    V4_OUTPUT_DIR, "action_model_mobile_json_no_aug_v6.h5"
 )
 ENCODER_MOBILE_JSON_NO_AUG = os.path.join(
-    V4_OUTPUT_DIR, "label_encoder_mobile_json_no_aug_v5.pkl"
+    V4_OUTPUT_DIR, "label_encoder_mobile_json_no_aug_v6.pkl"
 )
 
 

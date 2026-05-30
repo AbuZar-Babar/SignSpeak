@@ -66,3 +66,6 @@ who
 help
 need
 hungry
+come
+give
+want

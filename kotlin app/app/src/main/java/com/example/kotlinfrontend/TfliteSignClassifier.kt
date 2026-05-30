@@ -18,11 +18,11 @@ enum class SignModel(
     val labelsAssetPath: String
 ) {
     BASELINE(
-        displayName = "Baseline",
+        displayName = "Mobile JSON v6",
         backendKey = "baseline",
-        modelAssetPath = "action_model_baseline_new.tflite",
-        quantizedModelAssetPath = "action_model_baseline_new_quantized.tflite",
-        labelsAssetPath = "labels_baseline_new.json"
+        modelAssetPath = "action_model_mobile_json_v6.tflite",
+        quantizedModelAssetPath = "action_model_mobile_json_v6.tflite",
+        labelsAssetPath = "labels_mobile_json_v6.json"
     ),
     AUGMENTED(
         displayName = "Augmented",

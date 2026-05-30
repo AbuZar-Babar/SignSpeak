@@ -37,6 +37,10 @@ MODEL_ARTIFACTS = {
         "model_path": os.path.join(MODELS_DIR, "new", "action_model_mobile_json_no_aug_v5.h5"),
         "encoder_path": os.path.join(MODELS_DIR, "new", "label_encoder_mobile_json_no_aug_v5.pkl"),
     },
+    "mobile_json_v6": {
+        "model_path": os.path.join(MODELS_DIR, "new", "action_model_mobile_json_no_aug_v6.h5"),
+        "encoder_path": os.path.join(MODELS_DIR, "new", "label_encoder_mobile_json_no_aug_v6.pkl"),
+    },
 }
 
 
@@ -110,7 +114,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Export SignSpeak Keras models to TensorFlow Lite.")
     parser.add_argument(
         "--model",
-        choices=["baseline", "augmented", "new50", "new50_mobile20", "mobile_json_v5", "all", "all_new"],
+        choices=[*MODEL_ARTIFACTS.keys(), "all", "all_new"],
         default="all_new",
         help="Which model to export",
     )
@@ -134,9 +138,9 @@ def main() -> None:
 
     output_dir = Path(args.output_dir).resolve()
     if args.model == "all":
-        model_keys = ["baseline", "augmented", "new50", "new50_mobile20"]
+        model_keys = ["baseline", "augmented", "new50", "new50_mobile20", "mobile_json_v6"]
     elif args.model == "all_new":
-        model_keys = ["new50", "new50_mobile20"]
+        model_keys = ["new50", "new50_mobile20", "mobile_json_v6"]
     else:
         model_keys = [args.model]
     quantize = args.quantize == "dynamic"
