@@ -202,7 +202,7 @@ fun LiveCameraScreen(
     // ── New user-facing camera controls ──────────────────────────────────────
     var useFrontCamera by remember { mutableStateOf(true) }
     var torchEnabled by remember { mutableStateOf(false) }
-    var settingsExpanded by remember { mutableStateOf(false) }
+    var settingsExpanded by remember { mutableStateOf(true) }
     // ─────────────────────────────────────────────────────────────────────────
     var controlsExpanded by remember { mutableStateOf(false) }
     var isRecording by remember { mutableStateOf(false) }
@@ -819,6 +819,25 @@ fun LiveCameraScreen(
                             }
                         }
                     )
+                }
+
+                SettingsSectionLabel("Model Quality")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    SignModel.entries.forEach { modelOption ->
+                        CameraOptionChip(
+                            label = modelOption.displayName,
+                            selected = selectedModel == modelOption,
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                if (selectedModel != modelOption) {
+                                    selectedModel = modelOption
+                                }
+                            }
+                        )
+                    }
                 }
 
                 SettingsSectionLabel("Smart Sentences")
@@ -1487,18 +1506,18 @@ fun LiveCameraScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            CameraOptionChip(
-                                label = "Augmented",
-                                selected = selectedModel == SignModel.AUGMENTED,
-                                modifier = Modifier.weight(1f),
-                                onClick = { if (selectedModel != SignModel.AUGMENTED) selectedModel = SignModel.AUGMENTED }
-                            )
-                            CameraOptionChip(
-                                label = "Baseline",
-                                selected = selectedModel == SignModel.BASELINE,
-                                modifier = Modifier.weight(1f),
-                                onClick = { if (selectedModel != SignModel.BASELINE) selectedModel = SignModel.BASELINE }
-                            )
+                            SignModel.entries.forEach { modelOption ->
+                                CameraOptionChip(
+                                    label = modelOption.displayName,
+                                    selected = selectedModel == modelOption,
+                                    modifier = Modifier.weight(1f),
+                                    onClick = {
+                                        if (selectedModel != modelOption) {
+                                            selectedModel = modelOption
+                                        }
+                                    }
+                                )
+                            }
                         }
 
                         // ── Capture speed section ──────────────────────────

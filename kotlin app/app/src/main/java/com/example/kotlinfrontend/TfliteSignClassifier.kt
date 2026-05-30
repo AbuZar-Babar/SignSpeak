@@ -30,6 +30,13 @@ enum class SignModel(
         modelAssetPath = "action_model_augmented_new.tflite",
         quantizedModelAssetPath = "action_model_augmented_new_quantized.tflite",
         labelsAssetPath = "labels_augmented_new.json"
+    ),
+    MOBILE_V6(
+        displayName = "Mobile V6",
+        backendKey = "mobile_v6",
+        modelAssetPath = "action_model_mobile_json_v6.tflite",
+        quantizedModelAssetPath = "action_model_mobile_json_v6.tflite",
+        labelsAssetPath = "labels_mobile_json_v6.json"
     )
 }
 

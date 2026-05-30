@@ -87,6 +87,7 @@ object UiFormatters {
         return when (modelVersion.lowercase(Locale.getDefault())) {
             "augmented" -> "Augmented"
             "baseline" -> "Baseline"
+            "mobile_v6" -> "Mobile V6"
             else -> prettyWord(modelVersion)
         }
     }
