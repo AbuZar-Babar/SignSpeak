@@ -1,4 +1,24 @@
 import java.util.Properties
+import java.io.ByteArrayOutputStream
+
+// Determine Git branch suffix for dynamic applicationId
+val branchSuffix = try {
+    val process = ProcessBuilder("git", "rev-parse", "--abbrev-ref", "HEAD")
+        .directory(rootDir)
+        .redirectErrorStream(true)
+        .start()
+    val branch = process.inputStream.bufferedReader().readText().trim()
+    process.waitFor()
+    if (process.exitValue() == 0 && branch.isNotEmpty() && branch != "main" && branch != "HEAD" && branch != "master") {
+        val sanitized = branch.lowercase()
+            .replace(Regex("[^a-z0-9_]"), "_")
+            .replace(Regex("_+"), "_")
+            .trim('_')
+        if (sanitized.isNotEmpty()) ".$sanitized" else ""
+    } else ""
+} catch (e: Exception) {
+    ""
+}
 
 plugins {
     alias(libs.plugins.android.application)
@@ -29,11 +49,22 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.signspeak.abuzar"
+        applicationId = "com.signspeak.abuzar$branchSuffix"
         minSdk = 26
         targetSdk = 36
         versionCode = 2
         versionName = "1.0"
+
+        val appLabel = when (branchSuffix) {
+            ".emotion_detection" -> "SignSpeak emotion"
+            else -> if (branchSuffix.isNotEmpty()) "SignSpeak (${branchSuffix.removePrefix(".")})" else "SignSpeak"
+        }
+        val appIcon = if (branchSuffix == ".emotion_detection") "@mipmap/ic_launcher_emotion" else "@mipmap/ic_launcher"
+        val appRoundIcon = if (branchSuffix == ".emotion_detection") "@mipmap/ic_launcher_emotion" else "@mipmap/ic_launcher_round"
+
+        manifestPlaceholders["appLabel"] = appLabel
+        manifestPlaceholders["appIcon"] = appIcon
+        manifestPlaceholders["appRoundIcon"] = appRoundIcon
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "SUPABASE_URL", "\"${supabaseUrl.get()}\"")
