@@ -1,17 +1,18 @@
 """
-kaggle_train_mobile_only.py
-============================
-Kaggle-ready training script: Mobile-only dataset (mobile_data).
+kaggle_train_combined.py
+========================
+Kaggle-ready training script: Combined dataset (laptop_data + webcam_data).
 
 Dataset structure expected at /kaggle/input/:
   PakistanSignLanguageDataset/
     PakistanSignLanguage/
-      mobile_data/   <action>/<seq_id>/{0..59}.npy   (processed JSON-to-npy)
+      laptop_data/   <action>/<seq_id>/{0..59}.npy
+      webcam_data/   <action>/<seq_id>/{0..59}.npy
     links_to_words_final.txt
 
 Outputs (saved to /kaggle/working/):
-  psl_mobile_model.keras
-  psl_mobile_encoder.pkl
+  psl_combined_model.keras
+  psl_combined_encoder.pkl
 """
 
 import os
@@ -37,9 +38,9 @@ BATCH_SIZE       = 16
 EPOCHS           = 200
 LEARNING_RATE    = 0.001
 
-OUTPUT_DIR   = "/kaggle/working"
-MODEL_PATH   = os.path.join(OUTPUT_DIR, "psl_mobile_model.keras")
-ENCODER_PATH = os.path.join(OUTPUT_DIR, "psl_mobile_encoder.pkl")
+OUTPUT_DIR       = "/kaggle/working"
+MODEL_PATH       = os.path.join(OUTPUT_DIR, "psl_combined_model.keras")
+ENCODER_PATH     = os.path.join(OUTPUT_DIR, "psl_combined_encoder.pkl")
 
 # ============================================================
 # STEP 1: LOCATE DATASET
@@ -60,11 +61,11 @@ for p in CANDIDATE_ROOTS:
     if os.path.isdir(p) and DATASET_ROOT is None:
         DATASET_ROOT = p
 
-# Fallback: walk /kaggle/input looking for mobile_data sub-folder
+# Fallback: walk /kaggle/input looking for the sub-folders
 if DATASET_ROOT is None:
-    print("\n  Searching /kaggle/input for mobile_data ...")
+    print("\n  Searching /kaggle/input for laptop_data / webcam_data ...")
     for root, dirs, _ in os.walk("/kaggle/input"):
-        if "mobile_data" in dirs:
+        if "laptop_data" in dirs and "webcam_data" in dirs:
             DATASET_ROOT = root
             print(f"  Found via search: {root}")
             break
@@ -77,11 +78,13 @@ if DATASET_ROOT is None:
             print("  " + "  " * lvl + os.path.basename(root) + "/")
     raise FileNotFoundError("Dataset root not found — check the folder structure above.")
 
-MOBILE_DIR = os.path.join(DATASET_ROOT, "mobile_data")
-WORDS_FILE = os.path.join(os.path.dirname(DATASET_ROOT), "links_to_words_final.txt")
+LAPTOP_DIR  = os.path.join(DATASET_ROOT, "laptop_data")
+WEBCAM_DIR  = os.path.join(DATASET_ROOT, "webcam_data")
+WORDS_FILE  = os.path.join(os.path.dirname(DATASET_ROOT), "links_to_words_final.txt")
 
 print(f"\n  Dataset root : {DATASET_ROOT}")
-print(f"  mobile_data  : {'OK' if os.path.isdir(MOBILE_DIR) else 'MISSING'}")
+print(f"  laptop_data  : {'OK' if os.path.isdir(LAPTOP_DIR) else 'MISSING'}")
+print(f"  webcam_data  : {'OK' if os.path.isdir(WEBCAM_DIR) else 'MISSING'}")
 print(f"  words file   : {'OK' if os.path.isfile(WORDS_FILE) else 'MISSING'}")
 
 # ============================================================
@@ -92,6 +95,7 @@ print("STEP 2: Loading action list...")
 print("=" * 65)
 
 if not os.path.isfile(WORDS_FILE):
+    # Try sibling search
     for root, _, files in os.walk("/kaggle/input"):
         if "links_to_words_final.txt" in files:
             WORDS_FILE = os.path.join(root, "links_to_words_final.txt")
@@ -104,10 +108,10 @@ print(f"  Actions loaded: {len(ACTIONS)}")
 print(f"  First 10: {ACTIONS[:10]}")
 
 # ============================================================
-# STEP 3: LOAD DATA (mobile_data only)
+# STEP 3: LOAD DATA (laptop + webcam)
 # ============================================================
 print("\n" + "=" * 65)
-print("STEP 3: Loading mobile landmark sequences...")
+print("STEP 3: Loading landmark sequences...")
 print("=" * 65)
 
 
@@ -122,43 +126,61 @@ def _load_sequence(action_path: str, seq_id: str) -> list | None:
     return window
 
 
-if not os.path.isdir(MOBILE_DIR):
-    raise RuntimeError(f"mobile_data directory not found: {MOBILE_DIR}")
+def load_from_source(source_dir: str, actions: list, label: str, per_action_limit: int = None) -> tuple:
+    """Load valid sequences from one source directory, with optional per-action cap."""
+    sequences, labels = [], []
+    if not os.path.isdir(source_dir):
+        print(f"  WARNING: {source_dir} not found — skipping.")
+        return sequences, labels
 
-sequences, labels = [], []
-total_loaded  = 0
-total_skipped = 0
-
-for action in ACTIONS:
-    action_path = os.path.join(MOBILE_DIR, action)
-    if not os.path.isdir(action_path):
-        continue
-
-    seq_ids = sorted(
-        [d for d in os.listdir(action_path) if d.isdigit()],
-        key=int,
-    )
-
-    loaded = 0
-    for seq_id in seq_ids:
-        seq = _load_sequence(action_path, seq_id)
-        if seq is None:
-            total_skipped += 1
+    total_loaded = 0
+    total_skipped = 0
+    for action in actions:
+        action_path = os.path.join(source_dir, action)
+        if not os.path.isdir(action_path):
             continue
-        sequences.append(seq)
-        labels.append(action)
-        loaded += 1
-    total_loaded += loaded
-    print(f"  {action}: {loaded} seq loaded")
 
-print(f"\n  Total loaded : {total_loaded} | Skipped (incomplete): {total_skipped}")
+        seq_ids = sorted(
+            [d for d in os.listdir(action_path) if d.isdigit()],
+            key=int,
+        )
+        if per_action_limit is not None:
+            seq_ids = seq_ids[:per_action_limit]
 
-if not sequences:
-    raise RuntimeError("No sequences loaded! Check mobile_data path and action names.")
+        loaded = 0
+        for seq_id in seq_ids:
+            seq = _load_sequence(action_path, seq_id)
+            if seq is None:
+                total_skipped += 1
+                continue
+            sequences.append(seq)
+            labels.append(action)
+            loaded += 1
+        total_loaded += loaded
 
-X = np.array(sequences)
-y = np.array(labels)
-print(f"  X shape: {X.shape}")
+    limit_str = f", limit={per_action_limit}/action" if per_action_limit else ""
+    print(f"  [{label}{limit_str}] Loaded: {total_loaded} | Skipped (incomplete): {total_skipped}")
+    return sequences, labels
+
+
+all_sequences, all_labels = [], []
+
+# Matches local training_pipeline_no_aug.py: laptop 50/action, webcam all
+laptop_seqs, laptop_labels = load_from_source(LAPTOP_DIR, ACTIONS, "laptop_data", per_action_limit=50)
+all_sequences.extend(laptop_seqs)
+all_labels.extend(laptop_labels)
+
+webcam_seqs, webcam_labels = load_from_source(WEBCAM_DIR, ACTIONS, "webcam_data")
+all_sequences.extend(webcam_seqs)
+all_labels.extend(webcam_labels)
+
+if not all_sequences:
+    raise RuntimeError("No sequences loaded at all! Check dataset paths and action names.")
+
+X = np.array(all_sequences)
+y = np.array(all_labels)
+print(f"\n  Total sequences: {X.shape[0]}")
+print(f"  X shape        : {X.shape}")
 
 # ============================================================
 # STEP 4: FILTER CLASSES WITH < 2 SAMPLES
@@ -275,16 +297,16 @@ plt.figure(figsize=(12, 4))
 plt.subplot(1, 2, 1)
 plt.plot(history.history["accuracy"],     label="Train")
 plt.plot(history.history["val_accuracy"], label="Val")
-plt.title("Accuracy — Mobile Only")
+plt.title("Accuracy — Combined (laptop + webcam)")
 plt.xlabel("Epoch"); plt.ylabel("Accuracy"); plt.legend()
 
 plt.subplot(1, 2, 2)
 plt.plot(history.history["loss"],     label="Train")
 plt.plot(history.history["val_loss"], label="Val")
-plt.title("Loss — Mobile Only")
+plt.title("Loss — Combined (laptop + webcam)")
 plt.xlabel("Epoch"); plt.ylabel("Loss"); plt.legend()
 
 plt.tight_layout()
-plt.savefig(os.path.join(OUTPUT_DIR, "psl_mobile_training_curves.png"), dpi=150)
+plt.savefig(os.path.join(OUTPUT_DIR, "psl_combined_training_curves.png"), dpi=150)
 plt.show()
-print("\nDONE — Mobile-only training complete.")
+print("\nDONE — Combined training complete.")
