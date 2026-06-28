@@ -48,17 +48,21 @@ print("=" * 65)
 print("STEP 1: Locating dataset...")
 print("=" * 65)
 
-# Set this to the path shown in the Kaggle Data Explorer sidebar.
-# It follows the pattern: /kaggle/input/<dataset-slug>/PakistanSignLanguageDataset/PakistanSignLanguage
-DATASET_ROOT = "/kaggle/input/pakistansignlanguagedatasetv2/PakistanSignLanguageDataset/PakistanSignLanguage"
+# Set this to match your Kaggle dataset path.
+# If your dataset is private/owned, it's usually under /kaggle/input/datasets/<username>/<slug>/...
+# Run the cell once — the error output will print the exact tree so you can copy the right path.
+DATASET_ROOT = "/kaggle/input/datasets/mohib123456/dynamic-word-level-pakistan-sign-language-dataset/PakistanSignLanguageDatasetV2/PakistanSignLanguageDatasetV2"
 
 if not os.path.isdir(DATASET_ROOT):
-    print(f"\nERROR: Dataset path not found: {DATASET_ROOT}")
-    print("\nAvailable datasets in /kaggle/input/:")
-    for name in sorted(os.listdir("/kaggle/input")):
-        print(f"  /kaggle/input/{name}/")
+    print(f"\nERROR: Dataset path not found:\n  {DATASET_ROOT}")
+    print("\nFull tree under /kaggle/input/ (4 levels):")
+    for root, dirs, files in os.walk("/kaggle/input"):
+        depth = root.replace("/kaggle/input", "").count(os.sep)
+        if depth < 4:
+            indent = "  " * depth
+            print(f"{indent}/{os.path.basename(root)}/")
     raise FileNotFoundError(
-        f"Fix DATASET_ROOT at the top of this script to match one of the paths above."
+        "Update DATASET_ROOT above to match the correct path from the tree above."
     )
 
 MOBILE_DIR = os.path.join(DATASET_ROOT, "mobile_data")
