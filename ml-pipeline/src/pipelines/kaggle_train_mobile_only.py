@@ -48,41 +48,25 @@ print("=" * 65)
 print("STEP 1: Locating dataset...")
 print("=" * 65)
 
-DATASET_ROOT = None
-CANDIDATE_ROOTS = [
-    "/kaggle/input/pakistan-sign-language-dataset-v2/PakistanSignLanguageDataset/PakistanSignLanguage",
-    "/kaggle/input/pakistansignlanguagedataset/PakistanSignLanguageDataset/PakistanSignLanguage",
-    "/kaggle/input/PakistanSignLanguageDataset/PakistanSignLanguage",
-]
+# Set this to the path shown in the Kaggle Data Explorer sidebar.
+# It follows the pattern: /kaggle/input/<dataset-slug>/PakistanSignLanguageDataset/PakistanSignLanguage
+DATASET_ROOT = "/kaggle/input/pakistansignlanguagedatasetv2/PakistanSignLanguageDataset/PakistanSignLanguage"
 
-for p in CANDIDATE_ROOTS:
-    print(f"  Checking: {p}  -> {'FOUND' if os.path.isdir(p) else 'not found'}")
-    if os.path.isdir(p) and DATASET_ROOT is None:
-        DATASET_ROOT = p
-
-# Fallback: walk /kaggle/input looking for mobile_data sub-folder
-if DATASET_ROOT is None:
-    print("\n  Searching /kaggle/input for mobile_data ...")
-    for root, dirs, _ in os.walk("/kaggle/input"):
-        if "mobile_data" in dirs:
-            DATASET_ROOT = root
-            print(f"  Found via search: {root}")
-            break
-
-if DATASET_ROOT is None:
-    print("\n  FATAL: Could not locate dataset. Tree dump:")
-    for root, dirs, files in os.walk("/kaggle/input", topdown=True):
-        lvl = root.replace("/kaggle/input", "").count(os.sep)
-        if lvl < 5:
-            print("  " + "  " * lvl + os.path.basename(root) + "/")
-    raise FileNotFoundError("Dataset root not found — check the folder structure above.")
+if not os.path.isdir(DATASET_ROOT):
+    print(f"\nERROR: Dataset path not found: {DATASET_ROOT}")
+    print("\nAvailable datasets in /kaggle/input/:")
+    for name in sorted(os.listdir("/kaggle/input")):
+        print(f"  /kaggle/input/{name}/")
+    raise FileNotFoundError(
+        f"Fix DATASET_ROOT at the top of this script to match one of the paths above."
+    )
 
 MOBILE_DIR = os.path.join(DATASET_ROOT, "mobile_data")
 WORDS_FILE = os.path.join(os.path.dirname(DATASET_ROOT), "links_to_words_final.txt")
 
-print(f"\n  Dataset root : {DATASET_ROOT}")
-print(f"  mobile_data  : {'OK' if os.path.isdir(MOBILE_DIR) else 'MISSING'}")
-print(f"  words file   : {'OK' if os.path.isfile(WORDS_FILE) else 'MISSING'}")
+print(f"  Dataset root : {DATASET_ROOT}")
+print(f"  mobile_data  : {'OK' if os.path.isdir(MOBILE_DIR) else 'MISSING — check folder name'}")
+print(f"  words file   : {'OK' if os.path.isfile(WORDS_FILE) else 'MISSING — check file name'}")
 
 # ============================================================
 # STEP 2: LOAD ACTIONS FROM links_to_words_final.txt
